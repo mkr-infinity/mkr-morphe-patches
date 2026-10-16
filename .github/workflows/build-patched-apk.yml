@@ -305,7 +305,7 @@ jobs:
 
       - name: Check for User-Uploaded APK Artifact
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: apk-${{ matrix.id }}
           path: input-apks
@@ -366,7 +366,7 @@ jobs:
 
       - name: Download all patched APK artifacts
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: "mkr-morphe-*-patched"
           path: release_apks
@@ -374,7 +374,7 @@ jobs:
 
       - name: Download all build diagnostic manifests
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: "mkr-morphe-*-diagnostics"
           path: release_manifests
