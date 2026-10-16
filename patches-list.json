@@ -1,5 +1,251 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "0.0.0",
-  "patches": []
+  "version": "1.0.0",
+  "patches": [
+    {
+      "name": "Discord Nitro & Banner Suppressor",
+      "description": "Suppresses Nitro upgrade banners, gift button prompts, and enables custom color themes.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.discord",
+          "name": "Discord",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#5865F2",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "250.0",
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": null,
+              "description": null
+            },
+            {
+              "version": "248.0",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Duolingo Promotion Suppressor",
+      "description": "Removes full-screen subscription prompts and streak repair purchase reminders.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.duolingo",
+          "name": "Duolingo",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#58CC02",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "6.28.2",
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": null,
+              "description": null
+            },
+            {
+              "version": "6.25.4",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Messenger Sponsored Cleaner",
+      "description": "Removes sponsored advertisements between chats and cleans up the stories carousel.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.facebook.orca",
+          "name": "Messenger",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#0084FF",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "480.0.0.45.109",
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": null,
+              "description": null
+            },
+            {
+              "version": "475.0.0.40.108",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "MovieBox Streaming Optimization",
+      "description": "Optimizes player buffer settings and removes non-critical in-app banner promos.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.movieboxpro.android",
+          "name": "MovieBox",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#FF5722",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "15.7",
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": null,
+              "description": null
+            },
+            {
+              "version": "15.6",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            },
+            {
+              "version": "15.5",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Smart Launcher Pro Features & Customizations",
+      "description": "Enables Pro UI customization hooks, layout grid overrides, and suppresses non-critical banner popups.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "ginlemon.flowerfree",
+          "name": "Smart Launcher",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#2196F3",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "6.4 build 049",
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": null,
+              "description": null
+            },
+            {
+              "version": "6.4 build 048",
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": null,
+              "description": null
+            },
+            {
+              "version": "6.4",
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": null,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Telegram Sponsored Filter",
+      "description": "Suppresses official sponsored channel posts and promotional banners in chat channels.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "org.telegram.messenger",
+          "name": "Telegram",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#24A1DE",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "11.8.2",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            },
+            {
+              "version": "11.7.1",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Twitch Ad Suppression & Stream Tweaks",
+      "description": "Suppresses embedded commercial breaks and enables background audio playback.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "tv.twitch.android.app",
+          "name": "Twitch",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#9146FF",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "20.8.0",
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": null,
+              "description": null
+            },
+            {
+              "version": "20.7.0",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    }
+  ]
 }

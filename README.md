@@ -179,16 +179,111 @@ Ensure the following settings are enabled in your repository:
 ## 🩹 Patches List
 
 <!-- PATCHES_START EXPANDED -->
+> **[v1.0.0](https://github.com/mkr-infinity/mkr-morphe-patches/releases/tag/v1.0.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;7 patches total
+<details open>
+<summary>📦 Discord&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
 
-#### MKR Morphe Patches Catalog
+**🎯 Supported versions:**
+
+| 🧪&nbsp;250.0 | 248.0 |
+| :---: | :---: |
 
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
-|---|---|---|
-| [Smart Launcher Customizations](#smart-launcher-customizations) | Provides launcher layout tweaks and UI theme overrides for Smart Launcher. | • Theme Overrides |
-| [MovieBox Streaming Optimization](#moviebox-streaming-optimization) | Optimizes player buffer settings and removes non-critical in-app banner promos. | • Buffer Size |
-| [Telegram Sponsored Filter](#telegram-sponsored-filter) | Suppresses official sponsored channel posts and promotional banners in chat channels. | • Filter Channels |
-| [Clone App](#clone-app) | Changes the app package name to allow installing the same app multiple times alongside the original. | • Package name<br>• Update permissions<br>• Update providers |
-| [GmsCore Support](#gmscore-support) | Allows YouTube and YouTube Music to work without root by using GmsCore. | • Redirect Auth |
+|----------|----------------|-----------|
+| [Discord Nitro & Banner Suppressor](#discord-nitro-banner-suppressor) | Suppresses Nitro upgrade banners, gift button prompts, and enables custom color themes. |  |
+
+</details>
+
+<details open>
+<summary>📦 Duolingo&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**🎯 Supported versions:**
+
+| 🧪&nbsp;6.28.2 | 6.25.4 |
+| :---: | :---: |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [Duolingo Promotion Suppressor](#duolingo-promotion-suppressor) | Removes full-screen subscription prompts and streak repair purchase reminders. |  |
+
+</details>
+
+<details open>
+<summary>📦 Messenger&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**🎯 Supported versions:**
+
+| 🧪&nbsp;480.0.0.45.109 | 475.0.0.40.108 |
+| :---: | :---: |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [Messenger Sponsored Cleaner](#messenger-sponsored-cleaner) | Removes sponsored advertisements between chats and cleans up the stories carousel. |  |
+
+</details>
+
+<details open>
+<summary>📦 MovieBox&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**🎯 Supported versions:**
+
+| 🧪&nbsp;15.7 | 15.6 | 15.5 |
+| :---: | :---: | :---: |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [MovieBox Streaming Optimization](#moviebox-streaming-optimization) | Optimizes player buffer settings and removes non-critical in-app banner promos. |  |
+
+</details>
+
+<details open>
+<summary>📦 Smart Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**🎯 Supported versions:**
+
+| 🧪&nbsp;6.4 build 049 | 🧪&nbsp;6.4 build 048 | 🧪&nbsp;6.4 |
+| :---: | :---: | :---: |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [Smart Launcher Pro Features & Customizations](#smart-launcher-pro-features-customizations) | Enables Pro UI customization hooks, layout grid overrides, and suppresses non-critical banner popups. |  |
+
+</details>
+
+<details open>
+<summary>📦 Telegram&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**🎯 Supported versions:**
+
+| 11.8.2 | 11.7.1 |
+| :---: | :---: |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [Telegram Sponsored Filter](#telegram-sponsored-filter) | Suppresses official sponsored channel posts and promotional banners in chat channels. |  |
+
+</details>
+
+<details open>
+<summary>📦 Twitch&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**🎯 Supported versions:**
+
+| 🧪&nbsp;20.8.0 | 20.7.0 |
+| :---: | :---: |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [Twitch Ad Suppression & Stream Tweaks](#twitch-ad-suppression-stream-tweaks) | Suppresses embedded commercial breaks and enables background audio playback. |  |
+
+</details>
 
 <!-- PATCHES_END -->
 
