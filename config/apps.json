@@ -1,0 +1,395 @@
+{
+  "_author": "mkr-infinity",
+  "_copyright": "Copyright (c) 2026 mkr-infinity (https://github.com/mkr-infinity/mkr-morphe-patches)",
+  "_description": "Central application registry for MKR Morphe Patches - catalog of supported targets, versions, and patch policies.",
+  "schema_version": "1.0.0",
+  "apps": [
+    {
+      "id": "youtube",
+      "display_name": "YouTube",
+      "package_id": "com.google.android.youtube",
+      "upstream_source": "MorpheApp/morphe-patches",
+      "source_type": "official_morphe",
+      "source_revision": "v1.47.0",
+      "compatible_versions": [
+        "21.40.161",
+        "21.39.522",
+        "21.38.130",
+        "21.28.208",
+        "21.23.492",
+        "21.20.405",
+        "21.16.256",
+        "20.51.39",
+        "20.21.37"
+      ],
+      "tested_versions": [
+        "21.20.405",
+        "20.51.39"
+      ],
+      "apk_input_policy": "manual_artifact_or_url",
+      "has_custom_patches": false,
+      "apk_build_supported": true,
+      "side_by_side_supported": true,
+      "clone_mechanism": "morphe_clone_app_and_gmscore",
+      "signing_requirement": "v2_v3_ephemeral_or_custom_keystore",
+      "requires_microg": true,
+      "enabled": true,
+      "status": "supported",
+      "description": "Official Morphe YouTube patches with ad blocking, background playback, sponsorblock, Return YouTube Dislike, and GmsCore support."
+    },
+    {
+      "id": "youtube_music",
+      "display_name": "YouTube Music",
+      "package_id": "com.google.android.apps.youtube.music",
+      "upstream_source": "MorpheApp/morphe-patches",
+      "source_type": "official_morphe",
+      "source_revision": "v1.47.0",
+      "compatible_versions": [
+        "9.40.51",
+        "9.39.52",
+        "9.38.51",
+        "9.20.53",
+        "9.15.51"
+      ],
+      "tested_versions": [
+        "9.20.53",
+        "9.15.51"
+      ],
+      "apk_input_policy": "manual_artifact_or_url",
+      "has_custom_patches": false,
+      "apk_build_supported": true,
+      "side_by_side_supported": true,
+      "clone_mechanism": "morphe_clone_app_and_gmscore",
+      "signing_requirement": "v2_v3_ephemeral_or_custom_keystore",
+      "requires_microg": true,
+      "enabled": true,
+      "status": "supported",
+      "description": "Official Morphe YouTube Music patches with audio ad blocking, background playback, and GmsCore support."
+    },
+    {
+      "id": "reddit",
+      "display_name": "Reddit",
+      "package_id": "com.reddit.frontpage",
+      "upstream_source": "MorpheApp/morphe-patches",
+      "source_type": "official_morphe",
+      "source_revision": "v1.47.0",
+      "compatible_versions": [
+        "2026.41.0",
+        "2026.40.0",
+        "2026.39.0",
+        "2026.24.0",
+        "2026.10.0"
+      ],
+      "tested_versions": [
+        "2026.24.0",
+        "2026.10.0"
+      ],
+      "apk_input_policy": "manual_artifact_or_url",
+      "has_custom_patches": false,
+      "apk_build_supported": true,
+      "side_by_side_supported": true,
+      "clone_mechanism": "morphe_clone_app",
+      "signing_requirement": "v2_v3_ephemeral_or_custom_keystore",
+      "requires_microg": false,
+      "enabled": true,
+      "status": "supported",
+      "description": "Official Morphe Reddit patches including promoted post ad blocking, custom OAuth client ID, and UI tweaks."
+    },
+    {
+      "id": "smart_launcher",
+      "display_name": "Smart Launcher",
+      "package_id": "ginlemon.flowerfree",
+      "upstream_source": "custom",
+      "source_type": "custom",
+      "source_revision": "main",
+      "compatible_versions": [
+        "6.4 build 049",
+        "6.4 build 048",
+        "6.4"
+      ],
+      "tested_versions": [
+        "6.4 build 049"
+      ],
+      "apk_input_policy": "manual_artifact_or_url",
+      "has_custom_patches": true,
+      "apk_build_supported": true,
+      "side_by_side_supported": false,
+      "side_by_side_note": "Android launchers register HOME intent categories; package renaming disrupts system launcher registration and widget bindings.",
+      "signing_requirement": "v2_v3_ephemeral_or_custom_keystore",
+      "requires_microg": false,
+      "enabled": true,
+      "status": "experimental",
+      "description": "Smart Launcher 6 with Pro customization hooks, layout grid overrides, and banner suppression. Primary installation recommended without side-by-side package rename."
+    },
+    {
+      "id": "moviebox",
+      "display_name": "MovieBox Pro Mobile",
+      "package_id": "com.movieboxpro.android",
+      "package_variants": [
+        "com.movieboxpro.android",
+        "com.community.mbox.tv",
+        "com.generalcomp.moviebox"
+      ],
+      "upstream_source": "custom",
+      "source_type": "custom",
+      "source_revision": "main",
+      "compatible_versions": [
+        "15.7",
+        "15.6",
+        "15.5"
+      ],
+      "tested_versions": [
+        "15.6"
+      ],
+      "apk_input_policy": "manual_artifact_or_url",
+      "has_custom_patches": true,
+      "apk_build_supported": true,
+      "side_by_side_supported": true,
+      "clone_mechanism": "morphe_clone_app",
+      "signing_requirement": "v2_v3_ephemeral_or_custom_keystore",
+      "requires_microg": false,
+      "enabled": true,
+      "status": "experimental",
+      "description": "MovieBox Pro Mobile edition streaming client (com.movieboxpro.android) with player buffer optimization."
+    },
+    {
+      "id": "instagram",
+      "display_name": "Instagram",
+      "package_id": "com.instagram.android",
+      "upstream_source": "custom",
+      "source_type": "custom",
+      "source_revision": "main",
+      "compatible_versions": [
+        "360.0.0.48.89",
+        "355.0.0.44.106",
+        "350.0.0.46.90"
+      ],
+      "tested_versions": [
+        "355.0.0.44.106"
+      ],
+      "apk_input_policy": "manual_artifact_or_url",
+      "has_custom_patches": true,
+      "apk_build_supported": true,
+      "side_by_side_supported": false,
+      "side_by_side_note": "Instagram includes tightly coupled Facebook SDK content providers; cloning requires heavy manifest rewrite and is experimental.",
+      "signing_requirement": "v2_v3_ephemeral_or_custom_keystore",
+      "requires_microg": false,
+      "enabled": true,
+      "status": "experimental",
+      "description": "Instagram sponsored posts and feed ad removal patch definitions."
+    },
+    {
+      "id": "telegram",
+      "display_name": "Telegram",
+      "package_id": "org.telegram.messenger",
+      "upstream_source": "custom",
+      "source_type": "custom",
+      "source_revision": "main",
+      "compatible_versions": [
+        "11.8.2",
+        "11.7.1",
+        "11.6.0"
+      ],
+      "tested_versions": [
+        "11.8.2"
+      ],
+      "apk_input_policy": "direct_download_supported_or_manual",
+      "direct_download_url": "https://telegram.org/dl/android/apk",
+      "has_custom_patches": true,
+      "apk_build_supported": true,
+      "side_by_side_supported": true,
+      "clone_mechanism": "morphe_clone_app",
+      "signing_requirement": "v2_v3_ephemeral_or_custom_keystore",
+      "requires_microg": false,
+      "enabled": true,
+      "status": "supported",
+      "description": "Official Telegram Android client with sponsored message removal and UI tweaks. Direct official APK download supported."
+    },
+    {
+      "id": "facebook",
+      "display_name": "Facebook",
+      "package_id": "com.facebook.katana",
+      "upstream_source": "custom",
+      "source_type": "custom",
+      "source_revision": "main",
+      "compatible_versions": [
+        "490.0.0.63.82",
+        "485.0.0.52.79"
+      ],
+      "tested_versions": [
+        "485.0.0.52.79"
+      ],
+      "apk_input_policy": "manual_artifact_or_url",
+      "has_custom_patches": true,
+      "apk_build_supported": true,
+      "side_by_side_supported": false,
+      "side_by_side_note": "Facebook uses deep native libraries and internal signature checks; side-by-side package rename frequently fails installation.",
+      "signing_requirement": "v2_v3_ephemeral_or_custom_keystore",
+      "requires_microg": false,
+      "enabled": true,
+      "status": "experimental",
+      "description": "Facebook mobile app ad filtering and suggested post suppression."
+    },
+    {
+      "id": "twitter",
+      "display_name": "Twitter / X",
+      "package_id": "com.twitter.android",
+      "upstream_source": "custom",
+      "source_type": "custom",
+      "source_revision": "main",
+      "compatible_versions": [
+        "10.70.0-release.0",
+        "10.65.0-release.0"
+      ],
+      "tested_versions": [
+        "10.65.0-release.0"
+      ],
+      "apk_input_policy": "manual_artifact_or_url",
+      "has_custom_patches": true,
+      "apk_build_supported": true,
+      "side_by_side_supported": true,
+      "clone_mechanism": "morphe_clone_app",
+      "signing_requirement": "v2_v3_ephemeral_or_custom_keystore",
+      "requires_microg": false,
+      "enabled": true,
+      "status": "experimental",
+      "description": "Twitter / X client timeline ad suppression and promoted post filter."
+    },
+    {
+      "id": "tiktok",
+      "display_name": "TikTok",
+      "package_id": "com.zhiliaoapp.musically",
+      "package_variants": [
+        "com.zhiliaoapp.musically",
+        "com.ss.android.ugc.trill"
+      ],
+      "upstream_source": "custom",
+      "source_type": "custom",
+      "source_revision": "main",
+      "compatible_versions": [
+        "37.5.4",
+        "37.4.3",
+        "37.2.3"
+      ],
+      "tested_versions": [
+        "37.4.3"
+      ],
+      "apk_input_policy": "manual_artifact_or_url",
+      "has_custom_patches": true,
+      "apk_build_supported": true,
+      "side_by_side_supported": true,
+      "clone_mechanism": "morphe_clone_app",
+      "signing_requirement": "v2_v3_ephemeral_or_custom_keystore",
+      "requires_microg": false,
+      "enabled": true,
+      "status": "experimental",
+      "description": "TikTok feed ad removal and regional lock bypass."
+    },
+    {
+      "id": "twitch",
+      "display_name": "Twitch",
+      "package_id": "tv.twitch.android.app",
+      "upstream_source": "custom",
+      "source_type": "custom",
+      "source_revision": "main",
+      "compatible_versions": [
+        "20.8.0",
+        "20.7.0",
+        "20.5.0",
+        "20.4.0"
+      ],
+      "tested_versions": [
+        "20.7.0"
+      ],
+      "apk_input_policy": "manual_artifact_or_url",
+      "has_custom_patches": true,
+      "apk_build_supported": true,
+      "side_by_side_supported": false,
+      "side_by_side_note": "Twitch experiences startup crashes if cloned naively without deep native string patches.",
+      "signing_requirement": "v2_v3_ephemeral_or_custom_keystore",
+      "requires_microg": false,
+      "enabled": true,
+      "status": "experimental",
+      "description": "Twitch stream player ad blocking and chat tweaks."
+    },
+    {
+      "id": "duolingo",
+      "display_name": "Duolingo",
+      "package_id": "com.duolingo",
+      "upstream_source": "custom",
+      "source_type": "custom",
+      "source_revision": "main",
+      "compatible_versions": [
+        "6.28.2",
+        "6.25.4",
+        "6.20.0"
+      ],
+      "tested_versions": [
+        "6.25.4"
+      ],
+      "apk_input_policy": "manual_artifact_or_url",
+      "has_custom_patches": true,
+      "apk_build_supported": true,
+      "side_by_side_supported": false,
+      "side_by_side_note": "Duolingo native libraries verify exact package signatures and authorities.",
+      "signing_requirement": "v2_v3_ephemeral_or_custom_keystore",
+      "requires_microg": false,
+      "enabled": true,
+      "status": "experimental",
+      "description": "Duolingo language learning client promotion popup suppression."
+    },
+    {
+      "id": "messenger",
+      "display_name": "Messenger",
+      "package_id": "com.facebook.orca",
+      "upstream_source": "custom",
+      "source_type": "custom",
+      "source_revision": "main",
+      "compatible_versions": [
+        "480.0.0.45.109",
+        "475.0.0.40.108"
+      ],
+      "tested_versions": [
+        "475.0.0.40.108"
+      ],
+      "apk_input_policy": "manual_artifact_or_url",
+      "has_custom_patches": true,
+      "apk_build_supported": true,
+      "side_by_side_supported": false,
+      "side_by_side_note": "Meta Facebook SDK cross-provider dependencies prevent reliable side-by-side package rename.",
+      "signing_requirement": "v2_v3_ephemeral_or_custom_keystore",
+      "requires_microg": false,
+      "enabled": true,
+      "status": "experimental",
+      "description": "Meta Messenger chat client sponsored ad removal and story tray cleanup."
+    },
+    {
+      "id": "discord",
+      "display_name": "Discord",
+      "package_id": "com.discord",
+      "upstream_source": "custom",
+      "source_type": "custom",
+      "source_revision": "main",
+      "compatible_versions": [
+        "250.0",
+        "248.0",
+        "245.0"
+      ],
+      "tested_versions": [
+        "248.0"
+      ],
+      "apk_input_policy": "manual_artifact_or_url",
+      "has_custom_patches": true,
+      "apk_build_supported": true,
+      "side_by_side_supported": true,
+      "clone_mechanism": "morphe_clone_app",
+      "signing_requirement": "v2_v3_ephemeral_or_custom_keystore",
+      "requires_microg": false,
+      "enabled": true,
+      "status": "experimental",
+      "description": "Discord mobile client UI customization and Nitro promotional banner suppression."
+    }
+  ]
+}
+
+

@@ -1,0 +1,25 @@
+{
+  "_author": "mkr-infinity",
+  "_copyright": "Copyright (c) 2026 mkr-infinity (https://github.com/mkr-infinity/mkr-morphe-patches)",
+  "_description": "Configuration tracking official upstream Morphe repositories and release versions.",
+  "upstream_sources": [
+    {
+      "id": "morphe-patches",
+      "name": "Morphe Official Patches",
+      "repository": "MorpheApp/morphe-patches",
+      "current_tracked_release": "v1.47.0",
+      "asset_pattern": "patches-*.mpp",
+      "api_url": "https://api.github.com/repos/MorpheApp/morphe-patches/releases/latest",
+      "enabled": true
+    },
+    {
+      "id": "morphe-desktop",
+      "name": "Morphe Desktop CLI Patcher",
+      "repository": "MorpheApp/morphe-desktop",
+      "current_tracked_release": "v1.18.1",
+      "asset_pattern": "morphe-desktop-*-all.jar",
+      "api_url": "https://api.github.com/repos/MorpheApp/morphe-desktop/releases/latest",
+      "enabled": true
+    }
+  ]
+}

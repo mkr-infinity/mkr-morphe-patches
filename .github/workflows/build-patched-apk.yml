@@ -1,0 +1,379 @@
+# Copyright (c) 2026 mkr-infinity (https://github.com/mkr-infinity/mkr-morphe-patches)
+# Manual-only APK build workflow for MKR Morphe Patches.
+# Strictly triggered on-demand via workflow_dispatch. Executes parallel matrix builds and publishes GitHub Releases.
+
+name: Build Patched APKs
+
+on:
+  workflow_dispatch:
+    inputs:
+      select_all:
+        description: "⚡ Select all eligible applications"
+        type: boolean
+        default: false
+
+      youtube:
+        description: "Build YouTube"
+        type: boolean
+        default: false
+
+      youtube_music:
+        description: "Build YouTube Music"
+        type: boolean
+        default: false
+
+      reddit:
+        description: "Build Reddit"
+        type: boolean
+        default: false
+
+      smart_launcher:
+        description: "Build Smart Launcher"
+        type: boolean
+        default: false
+
+      moviebox:
+        description: "Build MovieBox Pro Mobile"
+        type: boolean
+        default: false
+
+      instagram:
+        description: "Build Instagram"
+        type: boolean
+        default: false
+
+      telegram:
+        description: "Build Telegram"
+        type: boolean
+        default: false
+
+      facebook:
+        description: "Build Facebook"
+        type: boolean
+        default: false
+
+      twitter:
+        description: "Build Twitter / X"
+        type: boolean
+        default: false
+
+      tiktok:
+        description: "Build TikTok"
+        type: boolean
+        default: false
+
+      twitch:
+        description: "Build Twitch"
+        type: boolean
+        default: false
+
+      duolingo:
+        description: "Build Duolingo"
+        type: boolean
+        default: false
+
+      messenger:
+        description: "Build Messenger"
+        type: boolean
+        default: false
+
+      discord:
+        description: "Build Discord"
+        type: boolean
+        default: false
+
+      enable_side_by_side:
+        description: "Enable side-by-side clone (install alongside original app)"
+        type: boolean
+        default: true
+
+      custom_clone_pkg:
+        description: "Optional custom package name for side-by-side clone (leave empty for default .morphe)"
+        type: string
+        default: ""
+
+      experimental_mode:
+        description: "Experimental mode (allow unverified versions with --force)"
+        type: boolean
+        default: false
+
+      app_version:
+        description: "Target app version (defaults to 'latest' to always patch newest version)"
+        type: string
+        default: "latest"
+
+      publish_release:
+        description: "🚀 Create GitHub Release and upload all patched APKs"
+        type: boolean
+        default: true
+
+      apk_source_url:
+        description: "Optional direct download URL for input APK (if not provided via artifact)"
+        type: string
+        default: ""
+
+      extra_patch_options:
+        description: "Optional extra Morphe patch flags or options (e.g. -O amoled=true)"
+        type: string
+        default: ""
+
+      retain_diagnostics:
+        description: "Retain debug logs and patching diagnostics in artifacts"
+        type: boolean
+        default: true
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  resolve-apps:
+    name: Resolve Target Applications
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix-builder.outputs.matrix }}
+      count: ${{ steps.matrix-builder.outputs.count }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build Dynamic App Matrix
+        id: matrix-builder
+        run: |
+          python3 -c "
+          import json, sys, os
+          from pathlib import Path
+
+          inputs = {
+              'youtube': '${{ inputs.youtube }}' == 'true',
+              'youtube_music': '${{ inputs.youtube_music }}' == 'true',
+              'reddit': '${{ inputs.reddit }}' == 'true',
+              'smart_launcher': '${{ inputs.smart_launcher }}' == 'true',
+              'moviebox': '${{ inputs.moviebox }}' == 'true',
+              'instagram': '${{ inputs.instagram }}' == 'true',
+              'telegram': '${{ inputs.telegram }}' == 'true',
+              'facebook': '${{ inputs.facebook }}' == 'true',
+              'twitter': '${{ inputs.twitter }}' == 'true',
+              'tiktok': '${{ inputs.tiktok }}' == 'true',
+              'twitch': '${{ inputs.twitch }}' == 'true',
+              'duolingo': '${{ inputs.duolingo }}' == 'true',
+              'messenger': '${{ inputs.messenger }}' == 'true',
+              'discord': '${{ inputs.discord }}' == 'true',
+          }
+
+          select_all = '${{ inputs.select_all }}' == 'true'
+
+          config_path = Path('config/apps.json')
+          with open(config_path, 'r', encoding='utf-8') as f:
+              apps_data = json.load(f)
+
+          apps_by_id = {a['id']: a for a in apps_data.get('apps', [])}
+
+          selected_ids = list(inputs.keys()) if select_all else [k for k, v in inputs.items() if v]
+
+          if not selected_ids:
+              print('::error::No applications selected! Please select at least one application or enable \"select_all\".', file=sys.stderr)
+              sys.exit(1)
+
+          include = []
+          for aid in selected_ids:
+              if aid in apps_by_id:
+                  app = apps_by_id[aid]
+                  include.append({
+                      'id': aid,
+                      'name': app['display_name'],
+                      'package': app['package_id'],
+                      'status': app['status']
+                  })
+
+          matrix = {'include': include}
+          matrix_json = json.dumps(matrix)
+          print(f'Constructed build matrix with {len(include)} apps: {matrix_json}')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
+              f.write(f'matrix={matrix_json}\n')
+              f.write(f'count={len(include)}\n')
+          "
+
+  build-app:
+    name: "Patch: ${{ matrix.name }}"
+    needs: resolve-apps
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.resolve-apps.outputs.matrix) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Android Build Tools
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y aapt apksigner zipalign
+
+      - name: Cache Morphe Tooling & Patches
+        id: cache-tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            tools/
+            bundles/
+          key: morphe-tools-${{ runner.os }}-v1
+
+      - name: Download Morphe Desktop & Official Patches
+        run: |
+          mkdir -p tools bundles input-apks build/outputs
+
+          if [ ! -f "tools/morphe-desktop.jar" ]; then
+            echo "[*] Fetching latest Morphe Desktop release..."
+            DESKTOP_RELEASE_JSON=$(curl -s "https://api.github.com/repos/MorpheApp/morphe-desktop/releases/latest")
+            JAR_URL=$(echo "$DESKTOP_RELEASE_JSON" | jq -r '.assets[] | select(.name | endswith("-all.jar")) | .browser_download_url' | head -n 1)
+            curl -sL "$JAR_URL" -o tools/morphe-desktop.jar
+          fi
+
+          if [ ! -f "bundles/official-patches.mpp" ]; then
+            echo "[*] Fetching latest official Morphe Patches bundle..."
+            PATCHES_RELEASE_JSON=$(curl -s "https://api.github.com/repos/MorpheApp/morphe-patches/releases/latest")
+            MPP_URL=$(echo "$PATCHES_RELEASE_JSON" | jq -r '.assets[] | select(.name | endswith(".mpp")) | .browser_download_url' | head -n 1)
+            curl -sL "$MPP_URL" -o bundles/official-patches.mpp
+          fi
+
+      - name: Check for User-Uploaded APK Artifact
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: apk-${{ matrix.id }}
+          path: input-apks
+
+      - name: Run Morphe Patching Engine
+        id: patcher
+        env:
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          python3 scripts/patch_apk.py \
+            --selected-apps "${{ matrix.id }}" \
+            --morphe-jar "tools/morphe-desktop.jar" \
+            --patches-mpp "bundles/official-patches.mpp" \
+            --input-dir "input-apks" \
+            --output-dir "build/outputs" \
+            --app-version "${{ inputs.app_version }}" \
+            --apk-url "${{ inputs.apk_source_url }}" \
+            --custom-clone-pkg "${{ inputs.custom_clone_pkg }}" \
+            --extra-options "${{ inputs.extra_patch_options }}" \
+            ${{ inputs.experimental_mode && '--experimental-mode' || '' }} \
+            ${{ inputs.enable_side_by_side && '--enable-side-by-side' || '' }}
+
+      - name: Upload Patched APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mkr-morphe-${{ matrix.id }}-patched
+          path: build/outputs/${{ matrix.id }}-patched.apk
+          if-no-files-found: error
+
+      - name: Upload Diagnostics & Manifest
+        if: inputs.retain_diagnostics || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mkr-morphe-${{ matrix.id }}-diagnostics
+          path: |
+            build/outputs/${{ matrix.id }}-build-manifest.json
+            build/outputs/${{ matrix.id }}-result.json
+            build/outputs/${{ matrix.id }}-patch.log
+          if-no-files-found: ignore
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: [resolve-apps, build-app]
+    if: inputs.publish_release && always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all patched APK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "mkr-morphe-*-patched"
+          path: release_apks
+          merge-multiple: true
+
+      - name: Generate Short Notes & Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_NUM: ${{ github.run_number }}
+        run: |
+          mkdir -p release_dist
+          cp release_apks/*.apk release_dist/ 2>/dev/null || true
+
+          COUNT=$(ls -1 release_dist/*.apk 2>/dev/null | wc -l)
+          if [ "$COUNT" -eq 0 ]; then
+            echo "No patched APKs found to release. Skipping release creation."
+            exit 0
+          fi
+
+          TAG_NAME="apks-build-${RUN_NUM}"
+          RELEASE_TITLE="MKR Patched APKs (Build #${RUN_NUM})"
+
+          cat <<EOF > short_release_notes.md
+          ### 📱 MKR Morphe Patched Android APKs (Build #${RUN_NUM})
+
+          Automated on-demand Android APK build generated on $(date -u '+%Y-%m-%d %H:%M:%S UTC').
+
+          #### Included Patched APKs ($COUNT):
+          EOF
+
+          for f in release_dist/*.apk; do
+            [ -f "$f" ] || continue
+            FNAME=$(basename "$f")
+            FSIZE=$(du -h "$f" | cut -f1)
+            FSHA=$(sha256sum "$f" | cut -d' ' -f1)
+            echo "- **\`$FNAME\`** ($FSIZE) — SHA256: \`$FSHA\`" >> short_release_notes.md
+          done
+
+          cat <<EOF >> short_release_notes.md
+
+          > Built with official Morphe Desktop CLI & custom patch suite by @mkr-infinity.
+          EOF
+
+          echo "Publishing release $TAG_NAME with $COUNT APKs..."
+          gh release create "$TAG_NAME" \
+            release_dist/*.apk \
+            --title "$RELEASE_TITLE" \
+            --notes-file short_release_notes.md
+
+  build-summary:
+    name: Build Summary
+    needs: [resolve-apps, build-app, publish-release]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Render Overall Build Dashboard
+        run: |
+          echo "### 🚀 MKR Morphe Patched APK Parallel Run Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target Applications Processed:** ${{ needs.resolve-apps.outputs.count }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Run ID:** \`${{ github.run_id }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release Status:** Download individual APKs from the **GitHub Releases** tab or the workflow **Artifacts**." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "*Maintained by @mkr-infinity for [mkr-morphe-patches](https://github.com/mkr-infinity/mkr-morphe-patches)*" >> $GITHUB_STEP_SUMMARY
