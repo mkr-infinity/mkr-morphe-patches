@@ -62,11 +62,16 @@ jobs:
             exit 0
           fi
 
-          # Create branch and commit config changes
-          git checkout -b "$BRANCH_NAME"
+          # Create or reset branch and commit config changes safely
+          git checkout -B "$BRANCH_NAME"
           git add config/upstream.json config/apps.json
-          git commit -m "$PR_TITLE [skip ci]"
-          git push origin "$BRANCH_NAME" --force
+          if ! git diff --staged --quiet; then
+            git commit -m "$PR_TITLE [skip ci]"
+            git push origin "$BRANCH_NAME" --force
+          else
+            echo "No staged config changes detected. Skipping commit and push."
+          fi
+
 
           # Open reviewable pull request
           gh pr create \

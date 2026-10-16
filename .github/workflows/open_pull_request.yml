@@ -1,4 +1,6 @@
+# Copyright (c) 2026 mkr-infinity (https://github.com/mkr-infinity/mkr-morphe-patches)
 name: Open a PR to main
+
 
 on:
   push:

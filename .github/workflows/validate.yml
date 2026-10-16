@@ -32,8 +32,10 @@ jobs:
 
       - name: Validate YAML files syntax
         run: |
+          python3 -m pip install --quiet pyyaml
           python3 -c "
           import yaml, glob, sys
+
           files = glob.glob('.github/**/*.yml', recursive=True) + glob.glob('.github/**/*.yaml', recursive=True)
           for f in files:
               try:
