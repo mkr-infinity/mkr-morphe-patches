@@ -41,9 +41,9 @@
    - Strictly triggered manually via `workflow_dispatch`.
    - Interactive checkbox selection for every app target, plus a `Select all apps` master switch.
    - Downloads/validates input APKs, applies official & custom patches, handles side-by-side app cloning, and uploads standalone signed APK artifacts.
-3. **Official Morphe Patch Bundle Releasing (`release.yml`)**:
-   - Preserves official semantic-release infrastructure (`.releaserc`).
-   - Automatically builds `.mpp` patch bundles and generates patch catalogs on conventional commits to `main` and `dev`.
+3. **CI Validation & Remote Patch Compilation (`validate.yml`)**:
+   - Validates central catalog parity, security boundaries, and YAML integrity.
+   - Verifies patch compilation remotely using GitHub Actions (`./gradlew :patches:buildAndroid`).
 
 ---
 

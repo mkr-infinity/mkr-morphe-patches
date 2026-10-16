@@ -13,13 +13,10 @@ Thank you for contributing to **mkr-morphe-patches**! This repository provides M
    - Custom patch source code lives in `patches/src/main/kotlin/app/mkr/patches/`.
    - Automated builds occur remote-only on GitHub Actions; no APK compilation or binary patching is executed locally.
 
-2. **Semantic Release & Branching Model**:
-   - `main`: Production release branch. Releases are published automatically when changes land here via conventional commits.
-   - `dev`: Active development and pre-release branch. Upstream update pull requests target `main` (or `dev`).
-   - Commit messages must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
-     - `feat:` triggers a minor release (`v1.X.0`).
-     - `fix:`, `perf:`, `bump:` trigger a patch release (`v1.0.X`).
-     - `chore:`, `docs:`, `test:` do not trigger a release unless scoped.
+2. **Branching Model & Releases**:
+   - `main`: Primary repository branch. All commits, pull requests, and automated upstream PRs target `main`.
+   - Patched APK releases are built and published on-demand using the [`build-patched-apk.yml`](.github/workflows/build-patched-apk.yml) workflow with concise changelogs and direct APK downloads.
+   - Commit messages should follow the [Conventional Commits](https://www.conventionalcommits.org/) specification (`feat:`, `fix:`, `perf:`, `chore:`, `bump:`).
 
 3. **Three-Document Policy**:
    - Project-owned Markdown documentation is strictly limited to three files: `README.md`, `CONTRIBUTING.md`, and `CHANGELOG.md`.
