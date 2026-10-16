@@ -1,12 +1,20 @@
 # Copyright (c) 2026 mkr-infinity (https://github.com/mkr-infinity/mkr-morphe-patches)
-# Manual-only APK build workflow for MKR Morphe Patches.
-# Strictly triggered on-demand via workflow_dispatch. Executes parallel matrix builds and publishes GitHub Releases.
+# Automatic and on-demand APK build workflow for MKR Morphe Patches.
+# Executes daily incremental update checks (06:00 UTC) and manual workflow_dispatch builds,
+# applying Morphe patches in parallel and publishing verified APKs with manifests to GitHub Releases.
 
 name: Build Patched APKs
 
 on:
+  schedule:
+    - cron: '0 6 * * *'  # Daily at 06:00 UTC
   workflow_dispatch:
     inputs:
+      force_full_rebuild:
+        description: "⚡ Force full rebuild (rebuild all eligible apps, bypass incremental check)"
+        type: boolean
+        default: false
+
       select_all:
         description: "⚡ Select all eligible applications"
         type: boolean
@@ -97,11 +105,6 @@ on:
         type: boolean
         default: false
 
-      app_version:
-        description: "Target app version (defaults to 'latest' to always patch newest version)"
-        type: string
-        default: "latest"
-
       publish_release:
         description: "🚀 Create GitHub Release and upload all patched APKs"
         type: boolean
@@ -130,12 +133,16 @@ permissions:
   contents: write
 
 jobs:
-  resolve-apps:
-    name: Resolve Target Applications
+  plan-builds:
+    name: Plan Incremental Builds
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.matrix-builder.outputs.matrix }}
-      count: ${{ steps.matrix-builder.outputs.count }}
+      has_updates: ${{ steps.planner.outputs.has_updates }}
+      build_matrix: ${{ steps.planner.outputs.build_matrix }}
+      update_count: ${{ steps.planner.outputs.update_count }}
+      skip_count: ${{ steps.planner.outputs.skip_count }}
+      total_count: ${{ steps.planner.outputs.total_count }}
+      patch_revision: ${{ steps.planner.outputs.patch_revision }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -145,71 +152,80 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Build Dynamic App Matrix
-        id: matrix-builder
+      - name: Evaluate Incremental Build Plan
+        id: planner
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          FORCE_FULL: ${{ inputs.force_full_rebuild || 'false' }}
+          SELECT_ALL: ${{ inputs.select_all || 'false' }}
+          IN_YOUTUBE: ${{ inputs.youtube || 'false' }}
+          IN_YOUTUBE_MUSIC: ${{ inputs.youtube_music || 'false' }}
+          IN_REDDIT: ${{ inputs.reddit || 'false' }}
+          IN_SMART_LAUNCHER: ${{ inputs.smart_launcher || 'false' }}
+          IN_MOVIEBOX: ${{ inputs.moviebox || 'false' }}
+          IN_INSTAGRAM: ${{ inputs.instagram || 'false' }}
+          IN_TELEGRAM: ${{ inputs.telegram || 'false' }}
+          IN_FACEBOOK: ${{ inputs.facebook || 'false' }}
+          IN_TWITTER: ${{ inputs.twitter || 'false' }}
+          IN_TIKTOK: ${{ inputs.tiktok || 'false' }}
+          IN_TWITCH: ${{ inputs.twitch || 'false' }}
+          IN_DUOLINGO: ${{ inputs.duolingo || 'false' }}
+          IN_MESSENGER: ${{ inputs.messenger || 'false' }}
+          IN_DISCORD: ${{ inputs.discord || 'false' }}
         run: |
-          python3 -c "
-          import json, sys, os
-          from pathlib import Path
+          # Determine selected apps from manual dispatch inputs
+          SELECTED_ARG="all"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$SELECT_ALL" != "true" ]; then
+            SELECTED=()
+            [ "$IN_YOUTUBE" = "true" ] && SELECTED+=("youtube")
+            [ "$IN_YOUTUBE_MUSIC" = "true" ] && SELECTED+=("youtube_music")
+            [ "$IN_REDDIT" = "true" ] && SELECTED+=("reddit")
+            [ "$IN_SMART_LAUNCHER" = "true" ] && SELECTED+=("smart_launcher")
+            [ "$IN_MOVIEBOX" = "true" ] && SELECTED+=("moviebox")
+            [ "$IN_INSTAGRAM" = "true" ] && SELECTED+=("instagram")
+            [ "$IN_TELEGRAM" = "true" ] && SELECTED+=("telegram")
+            [ "$IN_FACEBOOK" = "true" ] && SELECTED+=("facebook")
+            [ "$IN_TWITTER" = "true" ] && SELECTED+=("twitter")
+            [ "$IN_TIKTOK" = "true" ] && SELECTED+=("tiktok")
+            [ "$IN_TWITCH" = "true" ] && SELECTED+=("twitch")
+            [ "$IN_DUOLINGO" = "true" ] && SELECTED+=("duolingo")
+            [ "$IN_MESSENGER" = "true" ] && SELECTED+=("messenger")
+            [ "$IN_DISCORD" = "true" ] && SELECTED+=("discord")
 
-          inputs = {
-              'youtube': '${{ inputs.youtube }}' == 'true',
-              'youtube_music': '${{ inputs.youtube_music }}' == 'true',
-              'reddit': '${{ inputs.reddit }}' == 'true',
-              'smart_launcher': '${{ inputs.smart_launcher }}' == 'true',
-              'moviebox': '${{ inputs.moviebox }}' == 'true',
-              'instagram': '${{ inputs.instagram }}' == 'true',
-              'telegram': '${{ inputs.telegram }}' == 'true',
-              'facebook': '${{ inputs.facebook }}' == 'true',
-              'twitter': '${{ inputs.twitter }}' == 'true',
-              'tiktok': '${{ inputs.tiktok }}' == 'true',
-              'twitch': '${{ inputs.twitch }}' == 'true',
-              'duolingo': '${{ inputs.duolingo }}' == 'true',
-              'messenger': '${{ inputs.messenger }}' == 'true',
-              'discord': '${{ inputs.discord }}' == 'true',
-          }
+            if [ ${#SELECTED[@]} -gt 0 ]; then
+              IFS=,
+              SELECTED_ARG="${SELECTED[*]}"
+              unset IFS
+            fi
+          fi
 
-          select_all = '${{ inputs.select_all }}' == 'true'
+          FORCE_ARG=""
+          if [ "$FORCE_FULL" = "true" ]; then
+            FORCE_ARG="--force-full"
+          fi
 
-          config_path = Path('config/apps.json')
-          with open(config_path, 'r', encoding='utf-8') as f:
-              apps_data = json.load(f)
+          echo "Running plan_builds.py with selected_apps='$SELECTED_ARG' $FORCE_ARG..."
+          python3 scripts/plan_builds.py \
+            --selected-apps "$SELECTED_ARG" \
+            $FORCE_ARG
 
-          apps_by_id = {a['id']: a for a in apps_data.get('apps', [])}
-
-          selected_ids = list(inputs.keys()) if select_all else [k for k, v in inputs.items() if v]
-
-          if not selected_ids:
-              print('::error::No applications selected! Please select at least one application or enable \"select_all\".', file=sys.stderr)
-              sys.exit(1)
-
-          include = []
-          for aid in selected_ids:
-              if aid in apps_by_id:
-                  app = apps_by_id[aid]
-                  include.append({
-                      'id': aid,
-                      'name': app['display_name'],
-                      'package': app['package_id'],
-                      'status': app['status']
-                  })
-
-          matrix = {'include': include}
-          matrix_json = json.dumps(matrix)
-          print(f'Constructed build matrix with {len(include)} apps: {matrix_json}')
-
-          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
-              f.write(f'matrix={matrix_json}\n')
-              f.write(f'count={len(include)}\n')
-          "
+      - name: Upload Build Plan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mkr-morphe-build-plan
+          path: build/outputs/build_plan.json
+          if-no-files-found: ignore
 
   build-app:
     name: "Patch: ${{ matrix.name }}"
-    needs: resolve-apps
+    needs: plan-builds
+    if: needs.plan-builds.outputs.has_updates == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.resolve-apps.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.plan-builds.outputs.build_matrix) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -244,7 +260,7 @@ jobs:
           path: |
             tools/
             bundles/
-          key: morphe-tools-${{ runner.os }}-v2
+          key: morphe-tools-${{ runner.os }}-${{ needs.plan-builds.outputs.patch_revision }}
 
       - name: Download Morphe Desktop & Official Patches
         env:
@@ -305,22 +321,24 @@ jobs:
             --patches-mpp "bundles/official-patches.mpp" \
             --input-dir "input-apks" \
             --output-dir "build/outputs" \
-            --app-version "${{ inputs.app_version }}" \
+            --app-version "${{ matrix.version }}" \
+            --patch-revision "${{ needs.plan-builds.outputs.patch_revision }}" \
             --apk-url "${{ inputs.apk_source_url }}" \
             --custom-clone-pkg "${{ inputs.custom_clone_pkg }}" \
             --extra-options "${{ inputs.extra_patch_options }}" \
-            ${{ inputs.experimental_mode && '--experimental-mode' || '' }} \
-            ${{ inputs.enable_side_by_side && '--enable-side-by-side' || '' }}
+            ${{ (inputs.experimental_mode || false) && '--experimental-mode' || '' }} \
+            ${{ (inputs.enable_side_by_side == false) && '' || '--enable-side-by-side' }}
 
       - name: Upload Patched APK Artifact
+        if: hashFiles(format('build/outputs/{0}-patched.apk', matrix.id)) != ''
         uses: actions/upload-artifact@v4
         with:
           name: mkr-morphe-${{ matrix.id }}-patched
           path: build/outputs/${{ matrix.id }}-patched.apk
-          if-no-files-found: error
+          if-no-files-found: ignore
 
       - name: Upload Diagnostics & Manifest
-        if: inputs.retain_diagnostics || failure()
+        if: inputs.retain_diagnostics || failure() || hashFiles(format('build/outputs/{0}-build-manifest.json', matrix.id)) != ''
         uses: actions/upload-artifact@v4
         with:
           name: mkr-morphe-${{ matrix.id }}-diagnostics
@@ -332,14 +350,19 @@ jobs:
 
   publish-release:
     name: Publish GitHub Release
-    needs: [resolve-apps, build-app]
-    if: inputs.publish_release && always()
+    needs: [plan-builds, build-app]
+    if: needs.plan-builds.outputs.has_updates == 'true' && (inputs.publish_release != false) && always()
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
       - name: Download all patched APK artifacts
         continue-on-error: true
@@ -349,66 +372,53 @@ jobs:
           path: release_apks
           merge-multiple: true
 
-      - name: Generate Short Notes & Create GitHub Release
+      - name: Download all build diagnostic manifests
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "mkr-morphe-*-diagnostics"
+          path: release_manifests
+          merge-multiple: true
+
+      - name: Download Previous Release Manifest
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUN_NUM: ${{ github.run_number }}
         run: |
-          mkdir -p release_dist
-          find release_apks -type f -name "*.apk" -exec cp {} release_dist/ \; 2>/dev/null || true
+          mkdir -p previous_state
+          gh release download --pattern "manifest.json" --dir previous_state || true
 
-          COUNT=$(ls -1 release_dist/*.apk 2>/dev/null | wc -l)
-          if [ "$COUNT" -eq 0 ]; then
-            echo "No patched APKs found to release. Skipping release creation."
-            exit 0
+      - name: Consolidate Manifest & Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_NUM: ${{ github.run_number }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          PREV_ARG=""
+          if [ -f "previous_state/manifest.json" ]; then
+            PREV_ARG="--previous-manifest previous_state/manifest.json"
           fi
 
-          TAG_NAME="apks-build-${RUN_NUM}"
-          RELEASE_TITLE="MKR Patched APKs (Build #${RUN_NUM})"
-
-          cat <<EOF > short_release_notes.md
-          ### 📱 MKR Morphe Patched Android APKs (Build #${RUN_NUM})
-
-          Automated on-demand Android APK build generated on $(date -u '+%Y-%m-%d %H:%M:%S UTC').
-
-          #### Included Patched APKs ($COUNT):
-          EOF
-
-          for f in release_dist/*.apk; do
-            [ -f "$f" ] || continue
-            FNAME=$(basename "$f")
-            FSIZE=$(du -h "$f" | cut -f1)
-            FSHA=$(sha256sum "$f" | cut -d' ' -f1)
-            echo "- **\`$FNAME\`** ($FSIZE) — SHA256: \`$FSHA\`" >> short_release_notes.md
-          done
-
-          cat <<EOF >> short_release_notes.md
-
-          > Built with official Morphe Desktop CLI & custom patch suite by @mkr-infinity.
-          EOF
-
-          if gh release view "$TAG_NAME" &>/dev/null; then
-            echo "Release $TAG_NAME already exists, uploading assets..."
-            gh release upload "$TAG_NAME" release_dist/*.apk --clobber
-          else
-            echo "Publishing release $TAG_NAME with $COUNT APKs..."
-            gh release create "$TAG_NAME" \
-              release_dist/*.apk \
-              --title "$RELEASE_TITLE" \
-              --notes-file short_release_notes.md
-          fi
+          python3 scripts/publish_release.py \
+            --manifests-dir "release_manifests" \
+            --apks-dir "release_apks" \
+            --run-number "$RUN_NUM" \
+            --run-id "$RUN_ID" \
+            $PREV_ARG
 
   build-summary:
     name: Build Summary
-    needs: [resolve-apps, build-app, publish-release]
+    needs: [plan-builds, build-app, publish-release]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Render Overall Build Dashboard
         run: |
-          echo "### 🚀 MKR Morphe Patched APK Parallel Run Complete" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 MKR Morphe Patched APK Pipeline Run Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Target Applications Processed:** ${{ needs.resolve-apps.outputs.count }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Evaluation Mode:** Incremental change detection via `manifest.json`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Eligible Builds Planned:** ${{ needs.plan-builds.outputs.update_count || 0 }} of ${{ needs.plan-builds.outputs.total_count || 0 }} applications" >> $GITHUB_STEP_SUMMARY
           echo "- **Build Run ID:** \`${{ github.run_id }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Release Status:** Download individual APKs from the **GitHub Releases** tab or the workflow **Artifacts**." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

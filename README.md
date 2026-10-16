@@ -8,7 +8,8 @@
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL_v3.0-d97706.svg?style=flat-square)](LICENSE)
 [![Morphe Compatible](https://img.shields.io/badge/Morphe-Compatible-f59e0b.svg?style=flat-square&logo=android)](https://github.com/MorpheApp)
 [![Maintainer](https://img.shields.io/badge/Maintainer-mkr--infinity-b45309.svg?style=flat-square&logo=github)](https://github.com/mkr-infinity)
-[![APK Builds](https://img.shields.io/badge/APK_Builds-Manual_Only-1e1e1e.svg?style=flat-square)](.github/workflows/build-patched-apk.yml)
+[![APK Builds](https://img.shields.io/badge/APK_Builds-Scheduled_%26_On--Demand-f59e0b.svg?style=flat-square)](.github/workflows/build-patched-apk.yml)
+[![Morphe Release](https://img.shields.io/badge/Morphe_Release-Automated-d97706.svg?style=flat-square)](.github/workflows/release.yml)
 [![Upstream Sync](https://img.shields.io/badge/Upstream_Sync-Automated-d97706.svg?style=flat-square)](.github/workflows/update-upstream.yml)
 
 <br>
@@ -30,18 +31,21 @@
 
 ## 🧭 Overview & Core Architecture
 
-`mkr-morphe-patches` maintains a clean separation between **upstream patch intelligence**, **custom patch implementations**, and **remotely triggered APK artifact compilation**:
+`mkr-morphe-patches` is an automated, configuration-driven Android patching laboratory and Morphe source repository:
 
-1. **Automatic Upstream Monitoring (`update-upstream.yml`)**:
-   - Monitored daily via scheduled GitHub Actions.
+1. **Automatic Daily & On-Demand APK Builds (`build-patched-apk.yml`)**:
+   - Runs automatically on a daily schedule (`06:00 UTC`) or manually via `workflow_dispatch`.
+   - **Incremental Build Planner (`scripts/plan_builds.py`)**: Fetches `manifest.json` from the latest release and diffs current target versions and patch bundle revisions. If nothing has changed, the build finishes in seconds with `SKIPPED_NO_CHANGE` without rebuilding APKs.
+   - **Isolated Matrix Builds**: If one or more apps update, GitHub Actions launches targeted matrix build jobs only for affected apps.
+   - **Consolidated Release Publisher (`scripts/publish_release.py`)**: Automatically updates `manifest.json`, rolls forward untouched APKs, publishes newly built APKs to GitHub Releases (`patched-apks`), and generates structured markdown release notes.
+   - Manual builds support `Select all apps`, individual app checkboxes, and `force_full_rebuild`.
+2. **Official Morphe Patch Bundle Release (`release.yml`)**:
+   - Compiles `.mpp` patch bundles, validates dex and resource patches, and automatically tags and publishes semantic releases for Morphe Manager and Morphe Desktop.
+3. **Automatic Upstream Monitoring (`update-upstream.yml`)**:
+   - Monitored weekly via scheduled GitHub Actions.
    - Compares releases from official upstream Morphe repositories (`MorpheApp/morphe-patches`, `MorpheApp/morphe-desktop`).
    - Opens a clean, reviewable pull request when new upstream releases or version targets are detected.
-   - **Never builds or publishes APKs automatically.**
-2. **On-Demand Manual APK Building (`build-patched-apk.yml`)**:
-   - Strictly triggered manually via `workflow_dispatch`.
-   - Interactive checkbox selection for every app target, plus a `Select all apps` master switch.
-   - Downloads/validates input APKs, applies official & custom patches, handles side-by-side app cloning, and uploads standalone signed APK artifacts.
-3. **CI Validation & Remote Patch Compilation (`validate.yml`)**:
+4. **CI Validation & Remote Patch Compilation (`validate.yml`)**:
    - Validates central catalog parity, security boundaries, and YAML integrity.
    - Verifies patch compilation remotely using GitHub Actions (`./gradlew :patches:buildAndroid`).
 
@@ -93,38 +97,49 @@ Click the link below on your Android device (with Morphe Manager installed):
 
 ---
 
-## 🛠️ Triggering On-Demand Remote APK Builds
+## 🛠️ Remote APK Builds & Automated Delivery
 
-Patched APKs are built **exclusively on GitHub-hosted runners** via manual trigger:
+Patched APKs are compiled **exclusively on GitHub-hosted runners** with output verification, signature generation, and consolidated release publishing.
 
-### Step 1: Open the Workflow
+### ⏱️ 1. Automatic Scheduled Builds
+- **Frequency**: Every day at `06:00 UTC` (`0 6 * * *`).
+- **Incremental Detection**: The workflow queries the latest GitHub Release (`patched-apks`) for `manifest.json`. It compares the recorded app versions and patch bundle revision against current versions.
+- **Efficient & Safe**: If nothing has changed, the run finishes in seconds (`SKIPPED_NO_CHANGE`) without compiling APKs or publishing empty releases. When an app or patch bundle updates, only affected applications are built in parallel matrix jobs.
+
+### 🚀 2. On-Demand Manual Builds
+To trigger a build manually with custom parameters:
 1. Navigate to your repository on GitHub: `https://github.com/mkr-infinity/mkr-morphe-patches`
 2. Click the **Actions** tab at the top.
 3. Select **Build Patched APKs** from the left-hand workflow list.
 4. Click the **Run workflow** dropdown button on the right.
+5. Select options:
+   - **`force_full_rebuild`**: Force rebuild all selected apps regardless of manifest state (bypasses incremental skip).
+   - **`⚡ Select all eligible applications`**: Check this box to build every supported application in one run.
+   - **Individual Checkboxes**: Target specific apps (e.g. `youtube`, `telegram`, `reddit`, etc.).
+   - **`Enable side-by-side clone`**: (Default: `true`) Modifies the application package name so the patched app can coexist alongside untouched apps.
+   - **`Optional custom package name`**: Enter a custom package name suffix (defaults to `.morphe`).
+   - **`Experimental mode`**: Force apply patches to unverified or bleeding-edge APK versions (`--force`).
+   - **`App version`**: Set to `latest_compatible` or enter an explicit version string.
+   - **`Optional direct download URL`**: Supply an HTTPS URL to a base APK file.
 
-### Step 2: Configure Inputs
-- **`⚡ Select all eligible applications`**: Check this box to build every supported application in one run.
-- **Individual Checkboxes**: Alternatively, check specific apps (e.g. `youtube`, `telegram`, `reddit`).
-- **`Enable side-by-side clone`**: (Default: `true`) Modifies the application package name so the patched app can be installed alongside your existing untouched application.
-- **`Optional custom package name`**: Enter a custom package name if you prefer a specific suffix (leave blank for standard `.morphe`).
-- **`Experimental mode`**: Check if you wish to apply patches to an unverified or bleeding-edge APK version (`--force`).
-- **`App version`**: Set to `latest_compatible` or enter an explicit version string.
-- **`Optional direct download URL`**: Supply an HTTPS URL to a trusted APK file if you are not using workflow artifact upload.
+### 📦 3. Base APK Input Sourcing Strategy
+Because proprietary apps cannot be permanently redistributed or stored in Git, base APKs are resolved through:
+- **Direct Automatic Downloads**:
+  - **Telegram (`telegram.org/android`)**: Downloaded automatically during workflow execution with zero manual steps.
+- **Workflow Artifact Upload**:
+  - Upload an untouched base APK as a GitHub Actions workflow artifact named `apk-<app_id>` (e.g. `apk-youtube`, `apk-reddit`, `apk-tiktok`) in your repository. The workflow detects and uses it automatically.
+- **Direct HTTPS URL Input**:
+  - When starting a manual run, specify an HTTPS URL in the `Optional direct download URL` input.
 
-### Step 3: Provide Input APKs
-Because YouTube, YouTube Music, and other proprietary targets do not distribute static public APK binaries, provide the base APK using either:
-1. **GitHub Artifact Upload**: Upload an artifact named `apk-<app_id>` (e.g. `apk-youtube`) to your repository.
-2. **Direct URL**: Specify a verifiable HTTPS direct link in the workflow input.
-3. **Official Direct Targets**: Apps like **Telegram** automatically download directly from their official site (`telegram.org/android`).
-
-### Step 4: Download Patched Artifacts
-Once the workflow run completes:
-1. Click into the completed workflow run.
-2. Scroll to the **Artifacts** section at the bottom.
-3. Download:
-   - **`mkr-morphe-patched-apks`**: Contains your signed, installable patched `.apk` files.
-   - **`mkr-morphe-build-diagnostics`**: Contains `build-manifest.json` with input/output checksums, applied patch lists, and detailed execution logs.
+### 📥 4. Downloading Patched Releases & Diagnostics
+Once the build completes:
+1. **GitHub Releases (`patched-apks`)**:
+   - Go to **Releases → Latest Patched APKs**: `https://github.com/mkr-infinity/mkr-morphe-patches/releases/tag/patched-apks`
+   - Download signed, installable APKs (e.g., `Telegram-v11.8.2-morphe-patched.apk`, `YouTube-v21.20.405-morphe-patched.apk`).
+   - Review the release notes table detailing build status, SHA-256 hashes, and patch revisions.
+   - `manifest.json` is attached to the release to track state across future scheduled runs.
+2. **GitHub Actions Run Artifacts**:
+   - Scroll to the bottom of the completed workflow run to download `mkr-morphe-patched-apks` (raw APK bundle) or `mkr-morphe-build-diagnostics` (per-app build manifests, patch options, and patching logs).
 
 ---
 

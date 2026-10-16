@@ -1,7 +1,7 @@
 <!-- Copyright (c) 2026 mkr-infinity (https://github.com/mkr-infinity/mkr-morphe-patches) -->
 # Contributing to MKR Morphe Patches
 
-Thank you for contributing to **mkr-morphe-patches**! This repository provides Morphe-compatible patch bundles, automated upstream synchronization, and on-demand remote APK builds.
+Thank you for contributing to **mkr-morphe-patches**! This repository provides Morphe-compatible patch bundles, automated upstream synchronization, and scheduled & on-demand remote APK builds.
 
 ---
 
@@ -15,7 +15,7 @@ Thank you for contributing to **mkr-morphe-patches**! This repository provides M
 
 2. **Branching Model & Releases**:
    - `main`: Primary repository branch. All commits, pull requests, and automated upstream PRs target `main`.
-   - Patched APK releases are built and published on-demand using the [`build-patched-apk.yml`](.github/workflows/build-patched-apk.yml) workflow with concise changelogs and direct APK downloads.
+   - Patched APK releases are built and published automatically on schedule (`06:00 UTC`) and on-demand using the [`build-patched-apk.yml`](.github/workflows/build-patched-apk.yml) workflow with incremental change detection, manifest consolidation, and direct APK downloads.
    - Commit messages should follow the [Conventional Commits](https://www.conventionalcommits.org/) specification (`feat:`, `fix:`, `perf:`, `chore:`, `bump:`).
 
 3. **Three-Document Policy**:

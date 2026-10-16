@@ -130,6 +130,7 @@ def main():
     parser.add_argument("--app-version", default="latest_compatible", help="Requested target version or 'latest_compatible'")
     parser.add_argument("--apk-url", default="", help="Direct APK download URL fallback")
     parser.add_argument("--extra-options", default="", help="Optional additional patch flags/options to forward to Morphe")
+    parser.add_argument("--patch-revision", default="unknown", help="Tracked Morphe patch revision")
 
     args = parser.parse_args()
 
@@ -206,14 +207,18 @@ def main():
 
         if not input_apk or not input_apk.is_file():
             err_msg = f"No input APK found for {display_name}. Upload an artifact named 'apk-{app_id}' or provide a direct download URL."
-            print(f"[FAIL] {err_msg}", file=sys.stderr)
-            build_results.append({
+            print(f"[SKIP] {err_msg}", file=sys.stderr)
+            entry = {
                 "app_id": app_id,
                 "display_name": display_name,
                 "package_id": expected_pkg,
-                "status": "FAILED",
+                "status": "SKIPPED_NO_SOURCE",
                 "reason": err_msg,
-            })
+                "build_timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            build_results.append(entry)
+            with open(out_dir / f"{app_id}-build-manifest.json", "w", encoding="utf-8") as mf:
+                json.dump(entry, mf, indent=2)
             continue
 
         # 2. Inspect and validate input APK
@@ -226,24 +231,32 @@ def main():
                 if actual_pkg not in allowed_variants:
                     err = f"Package mismatch! Expected '{expected_pkg}', detected '{actual_pkg}'."
                     print(f"[FAIL] {err}", file=sys.stderr)
-                    build_results.append({
+                    entry = {
                         "app_id": app_id,
                         "display_name": display_name,
                         "package_id": expected_pkg,
-                        "status": "FAILED",
+                        "status": "INCOMPATIBLE_VERSION",
                         "reason": err,
-                    })
+                        "build_timestamp": datetime.now(timezone.utc).isoformat(),
+                    }
+                    build_results.append(entry)
+                    with open(out_dir / f"{app_id}-build-manifest.json", "w", encoding="utf-8") as mf:
+                        json.dump(entry, mf, indent=2)
                     continue
         except Exception as e:
             err = f"Invalid input APK: {e}"
             print(f"[FAIL] {err}", file=sys.stderr)
-            build_results.append({
+            entry = {
                 "app_id": app_id,
                 "display_name": display_name,
                 "package_id": expected_pkg,
-                "status": "FAILED",
+                "status": "INCOMPATIBLE_VERSION",
                 "reason": err,
-            })
+                "build_timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            build_results.append(entry)
+            with open(out_dir / f"{app_id}-build-manifest.json", "w", encoding="utf-8") as mf:
+                json.dump(entry, mf, indent=2)
             continue
 
         # 3. Check version compatibility (defaults to latest available version)
@@ -259,14 +272,18 @@ def main():
         if not is_compatible and not force_patch and not args.experimental_mode:
             err = f"Version '{resolved_version}' is not verified compatible with {display_name}. Enable experimental_mode to bypass."
             print(f"[FAIL] {err}", file=sys.stderr)
-            build_results.append({
+            entry = {
                 "app_id": app_id,
                 "display_name": display_name,
                 "package_id": expected_pkg,
                 "version": resolved_version,
-                "status": "REJECTED_UNSUPPORTED_VERSION",
+                "status": "INCOMPATIBLE_VERSION",
                 "reason": err,
-            })
+                "build_timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            build_results.append(entry)
+            with open(out_dir / f"{app_id}-build-manifest.json", "w", encoding="utf-8") as mf:
+                json.dump(entry, mf, indent=2)
             continue
 
 
@@ -329,15 +346,20 @@ def main():
             print("--- LOG TAIL ---")
             print("\n".join(proc.stdout.splitlines()[-25:]))
             print("----------------")
-            build_results.append({
+            entry = {
                 "app_id": app_id,
                 "display_name": display_name,
                 "package_id": expected_pkg,
                 "version": resolved_version,
-                "status": "FAILED",
+                "patch_revision": args.patch_revision,
+                "status": "PATCH_FAILED",
                 "reason": err,
                 "log": str(log_path.relative_to(REPO_ROOT)),
-            })
+                "build_timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            build_results.append(entry)
+            with open(out_dir / f"{app_id}-build-manifest.json", "w", encoding="utf-8") as mf:
+                json.dump(entry, mf, indent=2)
             continue
 
         # 6. Validate output APK and signature
@@ -348,13 +370,18 @@ def main():
         except Exception as e:
             err = f"Patched APK validation failed: {e}"
             print(f"[FAIL] {err}", file=sys.stderr)
-            build_results.append({
+            entry = {
                 "app_id": app_id,
                 "display_name": display_name,
                 "package_id": expected_pkg,
-                "status": "INVALID_OUTPUT_APK",
+                "patch_revision": args.patch_revision,
+                "status": "PATCH_FAILED",
                 "reason": err,
-            })
+                "build_timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            build_results.append(entry)
+            with open(out_dir / f"{app_id}-build-manifest.json", "w", encoding="utf-8") as mf:
+                json.dump(entry, mf, indent=2)
             continue
 
         result_details = {}
@@ -372,9 +399,11 @@ def main():
             "package_id": expected_pkg,
             "output_package_id": out_pkg or (f"{expected_pkg}.morphe" if args.enable_side_by_side else expected_pkg),
             "input_version": resolved_version,
+            "patch_revision": args.patch_revision,
             "input_sha256": inspect_info["sha256"],
             "output_sha256": out_inspect["sha256"],
             "output_size_bytes": out_inspect["size"],
+            "output_apk": out_apk.name,
             "signature_status": sig_info.get("status"),
             "side_by_side_enabled": args.enable_side_by_side and app.get("side_by_side_supported", False),
             "experimental_mode": args.experimental_mode,
@@ -432,11 +461,10 @@ def main():
         with open(summary_file, "a", encoding="utf-8") as sf:
             sf.write(summary_md + "\n")
 
-    any_failures = any(r.get("status") != "SUCCESS" for r in build_results)
-    if any_failures:
-        print("\n[!] One or more apps failed patching. Review log artifacts for diagnostics.")
-        if not any(r.get("status") == "SUCCESS" for r in build_results):
-            sys.exit(1)
+    has_patch_failures = any(r.get("status") == "PATCH_FAILED" for r in build_results)
+    if has_patch_failures:
+        print("\n[!] One or more apps failed patching. Review log artifacts for diagnostics.", file=sys.stderr)
+        sys.exit(1)
 
     return 0
 

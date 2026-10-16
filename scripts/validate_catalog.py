@@ -95,16 +95,19 @@ def validate_workflow_inputs(registered_ids):
 
     content = WORKFLOW_PATH.read_text(encoding="utf-8")
 
-    # Strict check: only workflow_dispatch trigger allowed
-    if "push:" in content or "pull_request:" in content or "schedule:" in content:
-        raise ValueError("Security violation: build-patched-apk.yml must have NO push, pull_request, or schedule triggers.")
+    # Strict check: only schedule and workflow_dispatch triggers allowed; NO push or pull_request
+    if "push:" in content or "pull_request:" in content:
+        raise ValueError("Security violation: build-patched-apk.yml must have NO push or pull_request triggers.")
 
-    if "workflow_dispatch:" not in content:
-        raise ValueError("Missing workflow_dispatch trigger in build-patched-apk.yml.")
+    if "workflow_dispatch:" not in content or "schedule:" not in content:
+        raise ValueError("Missing workflow_dispatch or schedule trigger in build-patched-apk.yml.")
 
-    # Check for select_all input
+    # Check for required inputs
     if "select_all:" not in content:
         raise ValueError("Missing 'select_all' boolean input in build-patched-apk.yml.")
+
+    if "force_full_rebuild:" not in content:
+        raise ValueError("Missing 'force_full_rebuild' boolean input in build-patched-apk.yml.")
 
     # Check each registered app ID exists as an input
     for app_id in registered_ids:
