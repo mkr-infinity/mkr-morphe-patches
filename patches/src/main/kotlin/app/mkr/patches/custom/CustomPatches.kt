@@ -3,9 +3,13 @@
 
 package app.mkr.patches.custom
 
+import app.mkr.patches.shared.Constants.COMPATIBILITY_DISCORD
+import app.mkr.patches.shared.Constants.COMPATIBILITY_DUOLINGO
+import app.mkr.patches.shared.Constants.COMPATIBILITY_MESSENGER
 import app.mkr.patches.shared.Constants.COMPATIBILITY_MOVIEBOX
 import app.mkr.patches.shared.Constants.COMPATIBILITY_SMART_LAUNCHER
 import app.mkr.patches.shared.Constants.COMPATIBILITY_TELEGRAM
+import app.mkr.patches.shared.Constants.COMPATIBILITY_TWITCH
 import app.morphe.patcher.patch.resourcePatch
 
 @Suppress("unused")
@@ -16,25 +20,10 @@ val smartLauncherPatch = resourcePatch(
 ) {
     compatibleWith(COMPATIBILITY_SMART_LAUNCHER)
 
-    val enableProOption = booleanOption(
-        key = "enableProHooks",
-        default = true,
-        title = "Enable Pro Features",
-        description = "Unlocks experimental Pro UI styling, widget density, and appearance preferences."
-    )
-
-    val suppressBannersOption = booleanOption(
-        key = "suppressBanners",
-        default = true,
-        title = "Suppress Upgrade Banners",
-        description = "Removes upgrade nags and non-critical promotion popups."
-    )
-
     execute {
-        println("Applying Smart Launcher Pro customization hooks (enablePro=${enableProOption.value}, suppressBanners=${suppressBannersOption.value})...")
+        println("Applying Smart Launcher Pro customization hooks...")
     }
 }
-
 
 @Suppress("unused")
 val movieBoxPatch = resourcePatch(
@@ -68,7 +57,7 @@ val twitchPatch = resourcePatch(
     description = "Suppresses embedded commercial breaks and enables background audio playback.",
     default = true
 ) {
-    compatibleWith(app.mkr.patches.shared.Constants.COMPATIBILITY_TWITCH)
+    compatibleWith(COMPATIBILITY_TWITCH)
 
     execute {
         println("Applying Twitch ad suppression and stream enhancements...")
@@ -81,7 +70,7 @@ val duolingoPatch = resourcePatch(
     description = "Removes full-screen subscription prompts and streak repair purchase reminders.",
     default = true
 ) {
-    compatibleWith(app.mkr.patches.shared.Constants.COMPATIBILITY_DUOLINGO)
+    compatibleWith(COMPATIBILITY_DUOLINGO)
 
     execute {
         println("Applying Duolingo promotional banner suppression...")
@@ -94,7 +83,7 @@ val messengerPatch = resourcePatch(
     description = "Removes sponsored advertisements between chats and cleans up the stories carousel.",
     default = true
 ) {
-    compatibleWith(app.mkr.patches.shared.Constants.COMPATIBILITY_MESSENGER)
+    compatibleWith(COMPATIBILITY_MESSENGER)
 
     execute {
         println("Applying Messenger ad filtering...")
@@ -107,7 +96,7 @@ val discordPatch = resourcePatch(
     description = "Suppresses Nitro upgrade banners, gift button prompts, and enables custom color themes.",
     default = true
 ) {
-    compatibleWith(app.mkr.patches.shared.Constants.COMPATIBILITY_DISCORD)
+    compatibleWith(COMPATIBILITY_DISCORD)
 
     execute {
         println("Applying Discord UI tweaks and banner suppression...")
