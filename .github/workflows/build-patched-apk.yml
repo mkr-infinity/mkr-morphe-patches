@@ -212,7 +212,7 @@ jobs:
             $FORCE_ARG
 
       - name: Upload Build Plan Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mkr-morphe-build-plan
           path: build/outputs/build_plan.json
@@ -331,7 +331,7 @@ jobs:
 
       - name: Upload Patched APK Artifact
         if: hashFiles(format('build/outputs/{0}-patched.apk', matrix.id)) != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mkr-morphe-${{ matrix.id }}-patched
           path: build/outputs/${{ matrix.id }}-patched.apk
@@ -339,7 +339,7 @@ jobs:
 
       - name: Upload Diagnostics & Manifest
         if: inputs.retain_diagnostics || failure() || hashFiles(format('build/outputs/{0}-build-manifest.json', matrix.id)) != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mkr-morphe-${{ matrix.id }}-diagnostics
           path: |
