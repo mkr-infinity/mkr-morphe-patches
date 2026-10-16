@@ -145,7 +145,7 @@ jobs:
       patch_revision: ${{ steps.planner.outputs.patch_revision }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -228,7 +228,7 @@ jobs:
       matrix: ${{ fromJson(needs.plan-builds.outputs.build_matrix) }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Java 21
         uses: actions/setup-java@v4
@@ -357,7 +357,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Python
         uses: actions/setup-python@v5
