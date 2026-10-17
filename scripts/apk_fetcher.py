@@ -156,7 +156,10 @@ def download_file(url: str, dest_path: Path, headers: Optional[Dict[str, str]] =
                 temp_path.unlink()
             # Attempt curl CLI fallback if Python download failed
             try:
-                cmd = ["curl", "-sSL", "-L", "-A", req_headers.get("User-Agent", DESKTOP_UA), "-o", str(temp_path), url]
+                cmd = ["curl", "-sSL", "-L", "-A", req_headers.get("User-Agent", DESKTOP_UA)]
+                if "Referer" in req_headers:
+                    cmd.extend(["-e", req_headers["Referer"]])
+                cmd.extend(["-o", str(temp_path), url])
                 subprocess.run(cmd, check=True, timeout=timeout)
                 if temp_path.is_file() and temp_path.stat().st_size > 10000:
                     temp_path.replace(dest_path)
@@ -332,7 +335,11 @@ def fetch_from_apkpure_api(
 
         dl_url = selected_entry["asset"]["urls"][0]
         logging.info(f"Downloading {package_id} v{selected_version} from APKPure CDN...")
-        if download_file(dl_url, dest_path):
+        apk_headers = {
+            "User-Agent": APKPURE_API_HEADERS["User-Agent"],
+            "Referer": "https://apkpure.net/",
+        }
+        if download_file(dl_url, dest_path, headers=apk_headers):
             return True, selected_version
 
     except Exception as e:

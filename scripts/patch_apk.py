@@ -406,41 +406,52 @@ def main():
         out_apk = out_dir / f"{app_id}-patched.apk"
         result_json = out_dir / f"{app_id}-result.json"
 
+        # Resolve patch bundle paths
+        bundle_candidates = []
+        for p_str in args.patches_mpp.replace(",", " ").split():
+            bp = Path(p_str.strip())
+            if bp.is_file() and bp not in bundle_candidates:
+                bundle_candidates.append(bp)
+        bundles_dir = REPO_ROOT / "bundles"
+        if bundles_dir.is_dir():
+            for mpp_file in sorted(bundles_dir.glob("*.mpp")):
+                if mpp_file not in bundle_candidates and mpp_file.is_file() and mpp_file.stat().st_size > 0:
+                    bundle_candidates.append(mpp_file)
+        if not bundle_candidates:
+            bundle_candidates = [Path(args.patches_mpp.split(",")[0].strip())]
+
+        applied_patches = []
+        cmd_bundle_args = []
+        for idx, bp in enumerate(bundle_candidates):
+            cmd_bundle_args.extend(["-p", str(bp)])
+            # Apply bundle options immediately after the -p flag to conform with Picocli ArgGroup
+            if idx == 0:
+                if args.enable_side_by_side:
+                    if app.get("side_by_side_supported", False) and app_id not in ("youtube", "youtube_music"):
+                        print(f"[{display_name}] Enabling side-by-side 'Clone app' patch...")
+                        cmd_bundle_args.extend(["-e", "Clone app"])
+                        applied_patches.append("Clone app")
+                        if args.custom_clone_pkg:
+                            cmd_bundle_args.extend([f"-OpackageName={args.custom_clone_pkg}"])
+                    elif app_id not in ("youtube", "youtube_music"):
+                        note = app.get("side_by_side_note", "Side-by-side cloning is not supported for this app target.")
+                        print(f"[{display_name}] INFO: {note}")
+
+                if args.extra_options:
+                    import shlex
+                    cmd_bundle_args.extend(shlex.split(args.extra_options))
+
         cmd = [
             "java",
             "-jar", str(args.morphe_jar),
             "patch",
-            "-p", str(args.patches_mpp),
+            *cmd_bundle_args,
             "-o", str(out_apk),
             "-r", str(result_json),
         ]
 
         if args.experimental_mode or not is_compatible or force_patch:
             cmd.append("-f")
-
-
-        applied_patches = []
-        if args.enable_side_by_side:
-            if app.get("side_by_side_supported", False):
-                print(f"[{display_name}] Enabling side-by-side 'Clone app' patch...")
-                cmd.extend(["-e", "Clone app"])
-                applied_patches.append("Clone app")
-                if args.custom_clone_pkg:
-                    cmd.extend(["-O", f"Clone app:packageName={args.custom_clone_pkg}"])
-            else:
-                note = app.get("side_by_side_note", "Side-by-side cloning is not supported for this app target.")
-                print(f"[{display_name}] WARNING: {note}")
-
-        if app_id in ("youtube", "youtube_music"):
-            print(f"[{display_name}] Adding GmsCore support patch...")
-            cmd.extend(["-e", "GmsCore support"])
-            applied_patches.append("GmsCore support")
-
-        # Forward any extra user-defined options
-        if args.extra_options:
-            import shlex
-            extra_tokens = shlex.split(args.extra_options)
-            cmd.extend(extra_tokens)
 
         cmd.append(str(input_apk))
 
@@ -451,9 +462,37 @@ def main():
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         t_duration = round(time.time() - t_start, 2)
 
+        # Automatic clean fallback retry if primary run failed
+        if proc.returncode != 0 or not out_apk.is_file() or os.path.getsize(out_apk) == 0:
+            print(f"[{display_name}] Primary patch command failed (exit code {proc.returncode}). Retrying with clean default command...", file=sys.stderr)
+            clean_cmd = [
+                "java",
+                "-jar", str(args.morphe_jar),
+                "patch",
+            ]
+            for bp in bundle_candidates:
+                clean_cmd.extend(["-p", str(bp)])
+            clean_cmd.extend([
+                "-o", str(out_apk),
+                "-r", str(result_json),
+                "-f",
+                str(input_apk),
+            ])
+            print(f"[{display_name}] Executing Fallback Morphe command:")
+            print("  " + " ".join(clean_cmd))
+            proc_fallback = subprocess.run(clean_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            log_content = (proc.stdout or "") + "\n\n--- FALLBACK RUN ---\n" + (proc_fallback.stdout or "")
+            if proc_fallback.returncode == 0 and out_apk.is_file() and os.path.getsize(out_apk) > 0:
+                print(f"[{display_name}] Fallback patching succeeded!")
+                proc = proc_fallback
+            else:
+                proc = proc_fallback
+        else:
+            log_content = proc.stdout or ""
+
         # Save build log
         log_path = out_dir / f"{app_id}-patch.log"
-        log_path.write_text(proc.stdout, encoding="utf-8")
+        log_path.write_text(log_content, encoding="utf-8")
 
         if proc.returncode != 0 or not out_apk.is_file() or os.path.getsize(out_apk) == 0:
             err = f"Patcher failed with exit code {proc.returncode}."
@@ -476,6 +515,7 @@ def main():
             with open(out_dir / f"{app_id}-build-manifest.json", "w", encoding="utf-8") as mf:
                 json.dump(entry, mf, indent=2)
             continue
+
 
         # 6. Validate output APK and signature
         try:

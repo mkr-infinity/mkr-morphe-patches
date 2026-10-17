@@ -134,4 +134,9 @@ morphe-data/
 *.apks
 __pycache__/
 *.pyc
+input-apks/
+release_apks/
+release_dist/
+dist/
+build-summary.md
 
