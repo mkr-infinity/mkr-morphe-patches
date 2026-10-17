@@ -24,6 +24,13 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
+try:
+    from curl_cffi import requests as cffi_requests
+    HAS_CURL_CFFI = True
+except ImportError:
+    cffi_requests = None
+    HAS_CURL_CFFI = False
+
 # Standard desktop & mobile user agents
 DESKTOP_UA = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -96,22 +103,34 @@ def download_file(url: str, dest_path: Path, headers: Optional[Dict[str, str]] =
     if headers:
         req_headers.update(headers)
 
-    req = urllib.request.Request(url, headers=req_headers)
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     temp_path = dest_path.with_suffix(dest_path.suffix + ".part")
 
     for attempt in range(1, 4):
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as response:
-                total_size = int(response.headers.get("content-length", 0))
-                downloaded = 0
-                with open(temp_path, "wb") as f:
-                    while True:
-                        chunk = response.read(65536)
-                        if not chunk:
-                            break
-                        f.write(chunk)
-                        downloaded += len(chunk)
+            downloaded = 0
+            total_size = 0
+            if HAS_CURL_CFFI:
+                session = cffi_requests.Session(impersonate="chrome120")
+                with session.get(url, headers=req_headers, stream=True, timeout=timeout) as response:
+                    response.raise_for_status()
+                    total_size = int(response.headers.get("content-length", 0))
+                    with open(temp_path, "wb") as f:
+                        for chunk in response.iter_content(chunk_size=65536):
+                            if chunk:
+                                f.write(chunk)
+                                downloaded += len(chunk)
+            else:
+                req = urllib.request.Request(url, headers=req_headers)
+                with urllib.request.urlopen(req, timeout=timeout) as response:
+                    total_size = int(response.headers.get("content-length", 0))
+                    with open(temp_path, "wb") as f:
+                        while True:
+                            chunk = response.read(65536)
+                            if not chunk:
+                                break
+                            f.write(chunk)
+                            downloaded += len(chunk)
 
             if total_size > 0 and downloaded < total_size:
                 raise IOError(f"Truncated download ({downloaded}/{total_size} bytes)")
@@ -219,18 +238,29 @@ def fetch_from_apkpure_api(
     req = urllib.request.Request(api_url, headers=APKPURE_API_HEADERS)
 
     try:
-        with urllib.request.urlopen(req, timeout=25) as response:
-            if response.status != 200:
-                logging.warning(f"APKPure API responded with status {response.status}")
-                return False, ""
-            raw_data = response.read()
-            # If gzipped
+        data = None
+        if HAS_CURL_CFFI:
             try:
-                import gzip
-                raw_data = gzip.decompress(raw_data)
-            except Exception:
-                pass
-            data = json.loads(raw_data.decode("utf-8", errors="replace"))
+                session = cffi_requests.Session(impersonate="chrome120")
+                res = session.get(api_url, headers=APKPURE_API_HEADERS, timeout=25)
+                if res.status_code == 200:
+                    data = res.json()
+            except Exception as e:
+                logging.debug(f"curl_cffi APKPure query failed: {e}")
+
+        if not data:
+            req = urllib.request.Request(api_url, headers=APKPURE_API_HEADERS)
+            with urllib.request.urlopen(req, timeout=25) as response:
+                if response.status != 200:
+                    logging.warning(f"APKPure API responded with status {response.status}")
+                    return False, ""
+                raw_data = response.read()
+                try:
+                    import gzip
+                    raw_data = gzip.decompress(raw_data)
+                except Exception:
+                    pass
+                data = json.loads(raw_data.decode("utf-8", errors="replace"))
 
         version_list = data.get("version_list", [])
         if not version_list:
@@ -291,8 +321,19 @@ def fetch_from_aptoide(
     req = urllib.request.Request(url, headers={"User-Agent": DESKTOP_UA})
 
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
+        data = None
+        if HAS_CURL_CFFI:
+            try:
+                session = cffi_requests.Session(impersonate="chrome120")
+                res = session.get(url, headers={"User-Agent": DESKTOP_UA}, timeout=20)
+                if res.status_code == 200:
+                    data = res.json()
+            except Exception as e:
+                logging.debug(f"curl_cffi Aptoide lookup failed: {e}")
+
+        if not data:
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
 
         datalist = data.get("datalist", {}).get("list", [])
         if not datalist:

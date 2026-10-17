@@ -18,7 +18,7 @@ on:
       select_all:
         description: "⚡ Select all eligible applications"
         type: boolean
-        default: false
+        default: true
 
       youtube:
         description: "Build YouTube"
@@ -202,7 +202,7 @@ jobs:
           fi
 
           FORCE_ARG=""
-          if [ "$FORCE_FULL" = "true" ]; then
+          if [ "$FORCE_FULL" = "true" ] || [ "$SELECT_ALL" = "true" ]; then
             FORCE_ARG="--force-full"
           fi
 
@@ -246,6 +246,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Install Python Dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install curl-cffi requests beautifulsoup4
 
       - name: Wait for FlareSolverr Service
         run: |
@@ -354,6 +359,7 @@ jobs:
           path: |
             build/outputs/*${{ matrix.id }}*.apk
             build/outputs/*-morphe-patched.apk
+            build/outputs/*.apk
           if-no-files-found: ignore
 
       - name: Upload Diagnostics & Manifest

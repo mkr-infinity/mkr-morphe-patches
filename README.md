@@ -9,7 +9,6 @@
 [![Morphe Compatible](https://img.shields.io/badge/Morphe-Compatible-f59e0b.svg?style=flat-square&logo=android)](https://github.com/MorpheApp)
 [![Maintainer](https://img.shields.io/badge/Maintainer-mkr--infinity-b45309.svg?style=flat-square&logo=github)](https://github.com/mkr-infinity)
 [![APK Builds](https://img.shields.io/badge/APK_Builds-Scheduled_%26_On--Demand-f59e0b.svg?style=flat-square)](.github/workflows/build-patched-apk.yml)
-[![Morphe Release](https://img.shields.io/badge/Morphe_Release-Automated-d97706.svg?style=flat-square)](.github/workflows/release.yml)
 [![Upstream Sync](https://img.shields.io/badge/Upstream_Sync-Automated-d97706.svg?style=flat-square)](.github/workflows/update-upstream.yml)
 
 <br>
@@ -39,13 +38,11 @@
    - **Isolated Matrix Builds**: If one or more apps update, GitHub Actions launches targeted matrix build jobs only for affected apps.
    - **Consolidated Release Publisher (`scripts/publish_release.py`)**: Automatically updates `manifest.json`, rolls forward untouched APKs, publishes newly built APKs to GitHub Releases (`patched-apks`), and generates structured markdown release notes.
    - Manual builds support `Select all apps`, individual app checkboxes, and `force_full_rebuild`.
-2. **Official Morphe Patch Bundle Release (`release.yml`)**:
-   - Compiles `.mpp` patch bundles, validates dex and resource patches, and automatically tags and publishes semantic releases for Morphe Manager and Morphe Desktop.
-3. **Automatic Upstream Monitoring (`update-upstream.yml`)**:
+2. **Automatic Upstream Monitoring (`update-upstream.yml`)**:
    - Monitored weekly via scheduled GitHub Actions.
    - Compares releases from official upstream Morphe repositories (`MorpheApp/morphe-patches`, `MorpheApp/morphe-desktop`).
    - Opens a clean, reviewable pull request when new upstream releases or version targets are detected.
-4. **CI Validation & Remote Patch Compilation (`validate.yml`)**:
+3. **CI Validation & Remote Patch Compilation (`validate.yml`)**:
    - Validates central catalog parity, security boundaries, and YAML integrity.
    - Verifies patch compilation remotely using GitHub Actions (`./gradlew :patches:buildAndroid`).
 
