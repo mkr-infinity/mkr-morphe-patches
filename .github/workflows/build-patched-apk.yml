@@ -328,20 +328,6 @@ jobs:
             exit 1
           fi
 
-      - name: Build Local Custom Patches Bundle
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "[*] Building local custom patches bundle..."
-          chmod +x ./gradlew || true
-          ./gradlew :patches:buildAndroid --no-daemon || ./gradlew :patches:build --no-daemon || true
-          for mpp in $(find patches/build -name "*.mpp" 2>/dev/null); do
-            echo "Found compiled custom patch bundle: $mpp"
-            cp -f "$mpp" bundles/custom-patches.mpp
-            break
-          done
-
       - name: Check for User-Uploaded APK Artifact
         continue-on-error: true
         uses: actions/download-artifact@v4
@@ -358,7 +344,7 @@ jobs:
           python3 scripts/patch_apk.py \
             --selected-apps "${{ matrix.id }}" \
             --morphe-jar "tools/morphe-desktop.jar" \
-            --patches-mpp "bundles/official-patches.mpp,bundles/custom-patches.mpp" \
+            --patches-mpp "bundles/official-patches.mpp" \
             --input-dir "input-apks" \
             --output-dir "build/outputs" \
             --app-version "${{ matrix.version }}" \

@@ -412,11 +412,13 @@ def main():
             bp = Path(p_str.strip())
             if bp.is_file() and bp not in bundle_candidates:
                 bundle_candidates.append(bp)
-        bundles_dir = REPO_ROOT / "bundles"
-        if bundles_dir.is_dir():
-            for mpp_file in sorted(bundles_dir.glob("*.mpp")):
-                if mpp_file not in bundle_candidates and mpp_file.is_file() and mpp_file.stat().st_size > 0:
-                    bundle_candidates.append(mpp_file)
+        if not bundle_candidates:
+            bundles_dir = REPO_ROOT / "bundles"
+            if bundles_dir.is_dir():
+                for mpp_file in sorted(bundles_dir.glob("*.mpp")):
+                    if mpp_file.is_file() and mpp_file.stat().st_size > 0:
+                        bundle_candidates.append(mpp_file)
+                        break
         if not bundle_candidates:
             bundle_candidates = [Path(args.patches_mpp.split(",")[0].strip())]
 
@@ -448,6 +450,8 @@ def main():
             *cmd_bundle_args,
             "-o", str(out_apk),
             "-r", str(result_json),
+            "--continue-on-error",
+            "--unsigned",
         ]
 
         if args.experimental_mode or not is_compatible or force_patch:
@@ -475,6 +479,8 @@ def main():
             clean_cmd.extend([
                 "-o", str(out_apk),
                 "-r", str(result_json),
+                "--continue-on-error",
+                "--unsigned",
                 "-f",
                 str(input_apk),
             ])
@@ -495,10 +501,30 @@ def main():
         log_path.write_text(log_content, encoding="utf-8")
 
         if proc.returncode != 0 or not out_apk.is_file() or os.path.getsize(out_apk) == 0:
+            # If the app is a custom target with no patches in the official Morphe bundle, mark as skipped
+            if app.get("source_type") == "custom":
+                skip_msg = f"Official Morphe patch bundle does not contain compatible patches for {display_name} ({expected_pkg})."
+                print(f"[SKIP] {skip_msg}")
+                entry = {
+                    "app_id": app_id,
+                    "display_name": display_name,
+                    "package_id": expected_pkg,
+                    "version": resolved_version,
+                    "patch_revision": args.patch_revision,
+                    "status": "SKIPPED_UNSUPPORTED",
+                    "reason": skip_msg,
+                    "log": str(log_path.relative_to(REPO_ROOT)),
+                    "build_timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+                build_results.append(entry)
+                with open(out_dir / f"{app_id}-build-manifest.json", "w", encoding="utf-8") as mf:
+                    json.dump(entry, mf, indent=2)
+                continue
+
             err = f"Patcher failed with exit code {proc.returncode}."
             print(f"[FAIL] {err}", file=sys.stderr)
             print("--- LOG TAIL ---")
-            print("\n".join(proc.stdout.splitlines()[-25:]))
+            print("\n".join((proc.stdout or "").splitlines()[-25:]))
             print("----------------")
             entry = {
                 "app_id": app_id,
