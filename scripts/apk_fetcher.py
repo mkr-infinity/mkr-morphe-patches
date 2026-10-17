@@ -112,7 +112,9 @@ def download_file(url: str, dest_path: Path, headers: Optional[Dict[str, str]] =
             total_size = 0
             if HAS_CURL_CFFI:
                 session = cffi_requests.Session(impersonate="chrome120")
-                with session.get(url, headers=req_headers, stream=True, timeout=timeout) as response:
+                response = None
+                try:
+                    response = session.get(url, headers=req_headers, stream=True, timeout=timeout)
                     response.raise_for_status()
                     total_size = int(response.headers.get("content-length", 0))
                     with open(temp_path, "wb") as f:
@@ -120,6 +122,16 @@ def download_file(url: str, dest_path: Path, headers: Optional[Dict[str, str]] =
                             if chunk:
                                 f.write(chunk)
                                 downloaded += len(chunk)
+                finally:
+                    if response is not None:
+                        try:
+                            response.close()
+                        except Exception:
+                            pass
+                    try:
+                        session.close()
+                    except Exception:
+                        pass
             else:
                 req = urllib.request.Request(url, headers=req_headers)
                 with urllib.request.urlopen(req, timeout=timeout) as response:
@@ -142,6 +154,18 @@ def download_file(url: str, dest_path: Path, headers: Optional[Dict[str, str]] =
             logging.warning(f"Download attempt {attempt} failed for {url}: {e}")
             if temp_path.exists():
                 temp_path.unlink()
+            # Attempt curl CLI fallback if Python download failed
+            try:
+                cmd = ["curl", "-sSL", "-L", "-A", req_headers.get("User-Agent", DESKTOP_UA), "-o", str(temp_path), url]
+                subprocess.run(cmd, check=True, timeout=timeout)
+                if temp_path.is_file() and temp_path.stat().st_size > 10000:
+                    temp_path.replace(dest_path)
+                    logging.info(f"Successfully downloaded {dest_path.name} via curl CLI fallback ({dest_path.stat().st_size} bytes).")
+                    return True
+            except Exception as ce:
+                logging.debug(f"curl CLI fallback failed for {url}: {ce}")
+                if temp_path.exists():
+                    temp_path.unlink()
             if attempt < 3:
                 time.sleep(2 * attempt)
 
@@ -240,6 +264,7 @@ def fetch_from_apkpure_api(
     try:
         data = None
         if HAS_CURL_CFFI:
+            session = None
             try:
                 session = cffi_requests.Session(impersonate="chrome120")
                 res = session.get(api_url, headers=APKPURE_API_HEADERS, timeout=25)
@@ -247,6 +272,12 @@ def fetch_from_apkpure_api(
                     data = res.json()
             except Exception as e:
                 logging.debug(f"curl_cffi APKPure query failed: {e}")
+            finally:
+                if session is not None:
+                    try:
+                        session.close()
+                    except Exception:
+                        pass
 
         if not data:
             req = urllib.request.Request(api_url, headers=APKPURE_API_HEADERS)
@@ -323,6 +354,7 @@ def fetch_from_aptoide(
     try:
         data = None
         if HAS_CURL_CFFI:
+            session = None
             try:
                 session = cffi_requests.Session(impersonate="chrome120")
                 res = session.get(url, headers={"User-Agent": DESKTOP_UA}, timeout=20)
@@ -330,6 +362,12 @@ def fetch_from_aptoide(
                     data = res.json()
             except Exception as e:
                 logging.debug(f"curl_cffi Aptoide lookup failed: {e}")
+            finally:
+                if session is not None:
+                    try:
+                        session.close()
+                    except Exception:
+                        pass
 
         if not data:
             with urllib.request.urlopen(req, timeout=20) as resp:

@@ -379,7 +379,11 @@ jobs:
   publish-release:
     name: Publish GitHub Release
     needs: [plan-builds, build-app]
-    if: needs.plan-builds.outputs.has_updates == 'true' && (inputs.publish_release != false) && always()
+    if: |
+      always() &&
+      !cancelled() &&
+      needs.plan-builds.outputs.has_updates == 'true' &&
+      (github.event_name == 'push' || github.event_name == 'schedule' || inputs.publish_release == true)
     runs-on: ubuntu-latest
     permissions:
       contents: write

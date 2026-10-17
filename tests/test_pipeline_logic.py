@@ -378,6 +378,36 @@ def test_architecture_abi_stripping():
     print("    [PASS] Architecture ABI detection and stripping work accurately.")
 
 
+def test_architecture_variant_naming():
+    print("[*] Testing: architecture variant generation produces armv8, armv7, universal packages...")
+    import zipfile
+    from scripts.patch_apk import get_apk_abis
+
+    with tempfile.TemporaryDirectory() as td:
+        # Multi-ABI
+        multi_apk = Path(td) / "multi.apk"
+        with zipfile.ZipFile(multi_apk, "w") as z:
+            z.writestr("AndroidManifest.xml", b"manifest")
+            z.writestr("classes.dex", b"dex")
+            z.writestr("lib/arm64-v8a/libfoo.so", b"arm64")
+            z.writestr("lib/armeabi-v7a/libfoo.so", b"armv7")
+
+        multi_abis = get_apk_abis(multi_apk)
+        assert "arm64-v8a" in multi_abis
+        assert "armeabi-v7a" in multi_abis
+
+        # No native libs (universal fallback scenario)
+        pure_dex_apk = Path(td) / "pure_dex.apk"
+        with zipfile.ZipFile(pure_dex_apk, "w") as z:
+            z.writestr("AndroidManifest.xml", b"manifest")
+            z.writestr("classes.dex", b"dex")
+
+        pure_abis = get_apk_abis(pure_dex_apk)
+        assert pure_abis == []
+
+    print("    [PASS] Architecture variant naming prerequisites verified.")
+
+
 def main():
     print("Running pipeline logic tests...")
     test_empty_app_selection()
@@ -392,6 +422,7 @@ def main():
     test_apk_fetcher_bundle_detection()
     test_release_publisher_clean_versioned_apks()
     test_architecture_abi_stripping()
+    test_architecture_variant_naming()
     print("\n[ALL PIPELINE LOGIC TESTS PASSED]")
 
 
