@@ -6,9 +6,6 @@
 name: Build Patched APKs
 
 on:
-  push:
-    branches:
-      - main
   schedule:
     - cron: '0 6 * * *'  # Daily at 06:00 UTC
   workflow_dispatch:
@@ -205,7 +202,7 @@ jobs:
           fi
 
           FORCE_ARG=""
-          if [ "$FORCE_FULL" = "true" ] || [ "$SELECT_ALL" = "true" ] || [ "$EVENT_NAME" = "push" ]; then
+          if [ "$FORCE_FULL" = "true" ] || [ "$SELECT_ALL" = "true" ]; then
             FORCE_ARG="--force-full"
           fi
 
@@ -389,7 +386,7 @@ jobs:
       always() &&
       !cancelled() &&
       needs.plan-builds.outputs.has_updates == 'true' &&
-      (github.event_name == 'push' || github.event_name == 'schedule' || inputs.publish_release == true)
+      (github.event_name == 'schedule' || inputs.publish_release == true)
     runs-on: ubuntu-latest
     permissions:
       contents: write

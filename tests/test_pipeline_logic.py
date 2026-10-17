@@ -43,11 +43,11 @@ def test_invalid_app_id():
 
 
 def test_yaml_workflow_triggers():
-    print("[*] Testing: build-patched-apk.yml has push, schedule & workflow_dispatch without pull_request...")
+    print("[*] Testing: build-patched-apk.yml has schedule & workflow_dispatch without pull_request or push...")
     workflow_path = REPO_ROOT / ".github" / "workflows" / "build-patched-apk.yml"
     content = workflow_path.read_text(encoding="utf-8")
     assert "pull_request:" not in content, "Forbidden trigger pull_request found in build-patched-apk.yml!"
-    assert "push:" in content, "Missing push trigger in build-patched-apk.yml!"
+    assert "push:" not in content, "Forbidden trigger push found in build-patched-apk.yml!"
     assert "schedule:" in content, "Missing schedule trigger in build-patched-apk.yml!"
     assert "workflow_dispatch:" in content, "Missing workflow_dispatch trigger in build-patched-apk.yml!"
     assert "force_full_rebuild:" in content, "Missing force_full_rebuild input in build-patched-apk.yml!"
