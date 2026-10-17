@@ -397,7 +397,7 @@ def main():
             resolved_version = args.app_version
             force_patch = args.experimental_mode
 
-        is_compatible = resolved_version in app.get("compatible_versions", [])
+        is_compatible = (resolved_version == args.app_version) or (resolved_version in app.get("compatible_versions", []))
         if not is_compatible and not force_patch and not args.experimental_mode:
             err = f"Version '{resolved_version}' is not verified compatible with {display_name}. Enable experimental_mode to bypass."
             print(f"[FAIL] {err}", file=sys.stderr)
@@ -599,102 +599,33 @@ def main():
             except Exception:
                 pass
 
-        # Build architecture variants (arm64-v8a, universal, armeabi-v7a)
+        # Build universal package (single universal release APK per application)
         clean_name = re.sub(r"[^a-zA-Z0-9._-]", "_", display_name)
         abis = get_apk_abis(out_apk)
         print(f"[{display_name}] Detected native architectures in APK: {abis or ['universal']}")
 
-        staged_release_apks = []
-
-        # 1. Universal build
         univ_name = f"{clean_name}-v{resolved_version}-universal-morphe-patched.apk"
         univ_path = out_dir / univ_name
+
         if abis:
             temp_univ = out_dir / f"tmp_univ_{app_id}.apk"
+            # Strip unnecessary emulator-only architectures (x86, x86_64) to optimize size
+            # while keeping all mobile architectures (arm64-v8a, armeabi-v7a) intact for universal device compatibility
             strip_zip_entries(out_apk, temp_univ, ["lib/x86/*", "lib/x86_64/*"])
             sign_and_align_apk(temp_univ, univ_path)
             temp_univ.unlink(missing_ok=True)
         else:
             sign_and_align_apk(out_apk, univ_path)
-        staged_release_apks.append(univ_name)
-        print(f"[{display_name}] Generated universal package: {univ_name} ({univ_path.stat().st_size} bytes)")
 
-        # 2. ARM64-v8a / armv8 build
-        arm64_path = None
-        if "arm64-v8a" in abis:
-            arm64_name = f"{clean_name}-v{resolved_version}-arm64-v8a-morphe-patched.apk"
-            arm64_path = out_dir / arm64_name
-            temp_arm64 = out_dir / f"tmp_arm64_{app_id}.apk"
-            strip_zip_entries(out_apk, temp_arm64, ["lib/x86/*", "lib/x86_64/*", "lib/armeabi-v7a/*"])
-            sign_and_align_apk(temp_arm64, arm64_path)
-            temp_arm64.unlink(missing_ok=True)
-            staged_release_apks.append(arm64_name)
-            print(f"[{display_name}] Generated arm64-v8a package: {arm64_name} ({arm64_path.stat().st_size} bytes)")
+        # Remove raw intermediate patched APK so only the final signed universal package remains
+        if out_apk.is_file() and out_apk.resolve() != univ_path.resolve():
+            out_apk.unlink(missing_ok=True)
 
-            # Also generate armv8 package alias
-            armv8_name = f"{clean_name}-v{resolved_version}-armv8-morphe-patched.apk"
-            armv8_path = out_dir / armv8_name
-            try:
-                shutil.copy2(arm64_path, armv8_path)
-                staged_release_apks.append(armv8_name)
-                print(f"[{display_name}] Generated armv8 package alias: {armv8_name}")
-            except Exception:
-                pass
-        elif not abis:
-            # Fallback: if no native split ABI is present, universal serves as armv8 package
-            armv8_name = f"{clean_name}-v{resolved_version}-armv8-morphe-patched.apk"
-            armv8_path = out_dir / armv8_name
-            try:
-                shutil.copy2(univ_path, armv8_path)
-                staged_release_apks.append(armv8_name)
-                print(f"[{display_name}] Generated armv8 package (from universal fallback): {armv8_name}")
-            except Exception:
-                pass
+        staged_release_apks = [univ_name]
+        print(f"[{display_name}] Generated universal release package: {univ_name} ({univ_path.stat().st_size} bytes)")
 
-        # 3. ARMeabi-v7a / armv7 build
-        armv7_path = None
-        if "armeabi-v7a" in abis:
-            armv7_name = f"{clean_name}-v{resolved_version}-armeabi-v7a-morphe-patched.apk"
-            armv7_path = out_dir / armv7_name
-            temp_armv7 = out_dir / f"tmp_armv7_{app_id}.apk"
-            strip_zip_entries(out_apk, temp_armv7, ["lib/x86/*", "lib/x86_64/*", "lib/arm64-v8a/*"])
-            sign_and_align_apk(temp_armv7, armv7_path)
-            temp_armv7.unlink(missing_ok=True)
-            staged_release_apks.append(armv7_name)
-            print(f"[{display_name}] Generated armeabi-v7a package: {armv7_name} ({armv7_path.stat().st_size} bytes)")
-
-            # Also generate armv7 package alias
-            armv7_alias_name = f"{clean_name}-v{resolved_version}-armv7-morphe-patched.apk"
-            armv7_alias_path = out_dir / armv7_alias_name
-            try:
-                shutil.copy2(armv7_path, armv7_alias_path)
-                staged_release_apks.append(armv7_alias_name)
-                print(f"[{display_name}] Generated armv7 package alias: {armv7_alias_name}")
-            except Exception:
-                pass
-        elif not abis:
-            # Fallback: if no native split ABI is present, universal serves as armv7 package
-            armv7_alias_name = f"{clean_name}-v{resolved_version}-armv7-morphe-patched.apk"
-            armv7_alias_path = out_dir / armv7_alias_name
-            try:
-                shutil.copy2(univ_path, armv7_alias_path)
-                staged_release_apks.append(armv7_alias_name)
-                print(f"[{display_name}] Generated armv7 package (from universal fallback): {armv7_alias_name}")
-            except Exception:
-                pass
-
-        # Also provide generic version alias (points to arm64, armv8, or universal)
-        generic_name = f"{clean_name}-v{resolved_version}-morphe-patched.apk"
-        generic_path = out_dir / generic_name
-        primary_source = arm64_path if arm64_path and arm64_path.is_file() else univ_path
-        try:
-            shutil.copy2(primary_source, generic_path)
-            staged_release_apks.append(generic_name)
-        except Exception:
-            pass
-
-        primary_release_apk = staged_release_apks[0]
-        primary_release_path = out_dir / primary_release_apk
+        primary_release_apk = univ_name
+        primary_release_path = univ_path
         primary_inspect = inspect_apk(primary_release_path)
 
         # 7. Create build manifest
@@ -710,7 +641,7 @@ def main():
             "output_size_bytes": primary_inspect["size"],
             "output_apk": primary_release_apk,
             "output_apks": staged_release_apks,
-            "architectures": [a for a in ["universal", "arm64-v8a", "armv8", "armeabi-v7a", "armv7"] if any(a in name for name in staged_release_apks)],
+            "architectures": ["universal"],
             "signature_status": sig_info.get("status"),
             "side_by_side_enabled": args.enable_side_by_side and app.get("side_by_side_supported", False),
             "experimental_mode": args.experimental_mode,

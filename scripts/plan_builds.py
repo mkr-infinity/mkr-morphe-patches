@@ -111,7 +111,22 @@ def fetch_latest_release_manifest(repo: str = None) -> dict:
 
 
 def get_current_patch_revision(upstream_path: Path) -> str:
-    """Reads current tracked official Morphe patch release revision."""
+    """Reads current official Morphe patch release revision (queries live GitHub API with upstream.json fallback)."""
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    try:
+        url = "https://api.github.com/repos/MorpheApp/morphe-patches/releases/latest"
+        headers = {"User-Agent": "mkr-morphe-patches"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            live_tag = data.get("tag_name")
+            if live_tag:
+                return live_tag
+    except Exception as e:
+        print(f"[*] Live Morphe patch revision query note: {e}")
+
     if not upstream_path.is_file():
         return "unknown"
     try:
@@ -123,6 +138,39 @@ def get_current_patch_revision(upstream_path: Path) -> str:
     except Exception:
         pass
     return "unknown"
+
+
+def fetch_upstream_compatible_versions(patch_revision: str) -> dict:
+    """Dynamically fetches latest officially supported app versions from upstream patches-list.json."""
+    pkg_versions = {}
+    tags_to_try = [patch_revision, "main"] if patch_revision and patch_revision != "unknown" else ["main"]
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+
+    for tag in tags_to_try:
+        url = f"https://raw.githubusercontent.com/MorpheApp/morphe-patches/{tag}/patches-list.json"
+        headers = {"User-Agent": "mkr-morphe-patches"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            for p in data.get("patches", []):
+                for cp in (p.get("compatiblePackages") or []):
+                    pkg = cp.get("packageName") or cp.get("name")
+                    if not pkg:
+                        continue
+                    if pkg not in pkg_versions:
+                        pkg_versions[pkg] = set()
+                    for t in (cp.get("targets") or []):
+                        if isinstance(t, dict) and t.get("version"):
+                            pkg_versions[pkg].add(t.get("version"))
+            if pkg_versions:
+                break
+        except Exception:
+            pass
+
+    return {pkg: sorted(list(vers), reverse=True) for pkg, vers in pkg_versions.items() if vers}
 
 
 def probe_telegram_public_version() -> str:
@@ -141,19 +189,25 @@ def probe_telegram_public_version() -> str:
     return ""
 
 
-def resolve_app_target_version(app: dict) -> str:
-    """Determines the target usable version for an application."""
+def resolve_app_target_version(app: dict, dynamic_compat_map: dict = None) -> str:
+    """Determines the target usable version for an application, dynamically updating from live upstream."""
+    pkg = app["package_id"]
     app_id = app["id"]
-    compatible_versions = app.get("compatible_versions", [])
-    top_compatible = compatible_versions[0] if compatible_versions else "latest"
 
-    # For Telegram, check if official live version is discoverable
+    # 1. If upstream dynamically specifies compatible versions for this package
+    if dynamic_compat_map and pkg in dynamic_compat_map and dynamic_compat_map[pkg]:
+        top_upstream = dynamic_compat_map[pkg][0]
+        return top_upstream
+
+    # 2. For Telegram, check if official live version is discoverable
     if app_id == "telegram":
         live_ver = probe_telegram_public_version()
         if live_ver:
             return live_ver
 
-    return top_compatible
+    # 3. Fallback to catalog compatible_versions
+    compatible_versions = app.get("compatible_versions", [])
+    return compatible_versions[0] if compatible_versions else "latest"
 
 
 def plan_application_build(
@@ -162,13 +216,14 @@ def plan_application_build(
     current_patch_revision: str,
     force_full: bool,
     is_explicitly_selected: bool,
+    dynamic_compat_map: dict = None,
 ) -> dict:
     """Evaluates an application and determines if it is eligible for rebuild."""
     app_id = app["id"]
     display_name = app["display_name"]
     package_id = app["package_id"]
     enabled = app.get("enabled", True)
-    target_version = resolve_app_target_version(app)
+    target_version = resolve_app_target_version(app, dynamic_compat_map)
 
     if not enabled:
         return {
@@ -336,6 +391,9 @@ def main():
 
     prev_apps = prev_manifest.get("apps", {})
     current_patch_revision = get_current_patch_revision(upstream_path)
+    dynamic_compat_map = fetch_upstream_compatible_versions(current_patch_revision)
+    if dynamic_compat_map:
+        print(f"[*] Dynamically synchronized {len(dynamic_compat_map)} app packages from upstream Morphe patches.")
 
     print("=" * 65)
     print("MKR MORPHE PATCHES — AUTOMATIC BUILD PLANNER")
@@ -361,6 +419,7 @@ def main():
             current_patch_revision=current_patch_revision,
             force_full=args.force_full,
             is_explicitly_selected=is_explicit,
+            dynamic_compat_map=dynamic_compat_map,
         )
         plan_entries.append(eval_result)
 
