@@ -95,12 +95,12 @@ def validate_workflow_inputs(registered_ids):
 
     content = WORKFLOW_PATH.read_text(encoding="utf-8")
 
-    # Strict check: only schedule and workflow_dispatch triggers allowed; NO push or pull_request
-    if "push:" in content or "pull_request:" in content:
-        raise ValueError("Security violation: build-patched-apk.yml must have NO push or pull_request triggers.")
+    # Automated triggers: push on main, schedule, and workflow_dispatch. Pull requests remain forbidden.
+    if "pull_request:" in content:
+        raise ValueError("Security violation: build-patched-apk.yml must have NO pull_request triggers.")
 
-    if "workflow_dispatch:" not in content or "schedule:" not in content:
-        raise ValueError("Missing workflow_dispatch or schedule trigger in build-patched-apk.yml.")
+    if "push:" not in content or "workflow_dispatch:" not in content or "schedule:" not in content:
+        raise ValueError("Missing push, workflow_dispatch, or schedule trigger in build-patched-apk.yml.")
 
     # Check for required inputs
     if "select_all:" not in content:

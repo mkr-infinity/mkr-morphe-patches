@@ -190,6 +190,26 @@ def main():
         for m in new_non_success_manifests:
             notes_lines.append(f"| **{m.get('display_name', m.get('app_id'))}** | `{m.get('status')}` | {m.get('reason', '-')} |")
 
+    if staged_apks:
+        notes_lines.extend([
+            "",
+            "#### 📦 Downloadable APK Packages:",
+            "",
+            "| Package File | Size | Architecture |",
+            "|---|:---:|:---:|",
+        ])
+        for apk in sorted(staged_apks, key=lambda p: p.name):
+            size_mb = f"{apk.stat().st_size / (1024 * 1024):.1f} MB"
+            if "arm64-v8a" in apk.name:
+                arch_tag = "`arm64-v8a` (64-bit ARM)"
+            elif "armeabi-v7a" in apk.name:
+                arch_tag = "`armeabi-v7a` (32-bit ARM)"
+            elif "universal" in apk.name:
+                arch_tag = "`universal` (All Devices)"
+            else:
+                arch_tag = "`standard`"
+            notes_lines.append(f"| `{apk.name}` | {size_mb} | {arch_tag} |")
+
     notes_lines.extend([
         "",
         "#### 📦 Assets & Verification Manifest:",

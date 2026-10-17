@@ -117,6 +117,110 @@ def verify_apk_signature(apk_path):
         return {"status": "error", "details": str(e)}
 
 
+def get_apk_abis(apk_path):
+    """Returns the set of native ABIs present in the APK lib/ directory."""
+    abis = set()
+    try:
+        with zipfile.ZipFile(apk_path, "r") as z:
+            for name in z.namelist():
+                if name.startswith("lib/") and "/" in name[4:]:
+                    parts = name.split("/")
+                    if len(parts) >= 2 and parts[1]:
+                        abis.add(parts[1])
+    except Exception:
+        pass
+    return sorted(list(abis))
+
+
+def strip_zip_entries(src_path, dest_path, patterns):
+    """Copies src_path to dest_path while stripping entries matching patterns and signature files."""
+    import fnmatch
+    try:
+        with zipfile.ZipFile(src_path, "r") as zin:
+            with zipfile.ZipFile(dest_path, "w", compression=zipfile.ZIP_DEFLATED) as zout:
+                for item in zin.infolist():
+                    if item.filename.startswith("META-INF/") and (
+                        item.filename.endswith(".SF") or item.filename.endswith(".RSA") or item.filename.endswith(".MF")
+                    ):
+                        continue
+                    if any(fnmatch.fnmatch(item.filename, p) for p in patterns):
+                        continue
+                    zout.writestr(item, zin.read(item.filename))
+        return True
+    except Exception as e:
+        print(f"[!] Error stripping entries from {src_path.name}: {e}", file=sys.stderr)
+        shutil.copy2(src_path, dest_path)
+        return False
+
+
+def ensure_ephemeral_keystore():
+    """Generates an ephemeral keystore if not already created."""
+    ks_path = Path("/tmp/mkr_ephemeral.jks")
+    if ks_path.is_file():
+        return ks_path
+    cmd = [
+        "keytool", "-genkeypair", "-v",
+        "-keystore", str(ks_path),
+        "-alias", "mkr-morphe",
+        "-keyalg", "RSA",
+        "-keysize", "2048",
+        "-validity", "10000",
+        "-storepass", "android",
+        "-keypass", "android",
+        "-dname", "CN=Morphe, OU=Android, O=MKR, L=Global, S=Global, C=US"
+    ]
+    try:
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+    return ks_path
+
+
+def sign_and_align_apk(src_apk, dest_apk):
+    """Zipaligns and signs APK using apksigner if available, falling back to copy."""
+    apksigner = shutil.which("apksigner")
+    zipalign = shutil.which("zipalign")
+
+    aligned_path = dest_apk.with_suffix(".aligned.tmp")
+    if zipalign:
+        try:
+            res_align = subprocess.run([zipalign, "-f", "-p", "4", str(src_apk), str(aligned_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if res_align.returncode != 0:
+                shutil.copy2(src_apk, aligned_path)
+        except Exception:
+            shutil.copy2(src_apk, aligned_path)
+    else:
+        shutil.copy2(src_apk, aligned_path)
+
+    signed = False
+    if apksigner:
+        ks = ensure_ephemeral_keystore()
+        if ks.is_file():
+            try:
+                res_sign = subprocess.run([
+                    apksigner, "sign",
+                    "--ks", str(ks),
+                    "--ks-pass", "pass:android",
+                    "--key-pass", "pass:android",
+                    "--ks-key-alias", "mkr-morphe",
+                    "--out", str(dest_apk),
+                    str(aligned_path)
+                ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if res_sign.returncode == 0 and dest_apk.is_file() and dest_apk.stat().st_size > 0:
+                    signed = True
+            except Exception:
+                pass
+
+    if not signed:
+        if aligned_path.is_file():
+            aligned_path.replace(dest_apk)
+        else:
+            shutil.copy2(src_apk, dest_apk)
+    else:
+        aligned_path.unlink(missing_ok=True)
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(description="Mkr-Morphe APK Patching Driver")
     parser.add_argument("--selected-apps", required=True, help="Comma-separated app IDs or 'all'")
@@ -403,13 +507,61 @@ def main():
             except Exception:
                 pass
 
+        # Build architecture variants (arm64-v8a, universal, armeabi-v7a)
         clean_name = re.sub(r"[^a-zA-Z0-9._-]", "_", display_name)
-        release_apk_name = f"{clean_name}-v{resolved_version}-morphe-patched.apk"
-        release_apk_path = out_dir / release_apk_name
+        abis = get_apk_abis(out_apk)
+        print(f"[{display_name}] Detected native architectures in APK: {abis or ['universal']}")
+
+        staged_release_apks = []
+
+        # 1. Universal build
+        univ_name = f"{clean_name}-v{resolved_version}-universal-morphe-patched.apk"
+        univ_path = out_dir / univ_name
+        if abis:
+            temp_univ = out_dir / f"tmp_univ_{app_id}.apk"
+            strip_zip_entries(out_apk, temp_univ, ["lib/x86/*", "lib/x86_64/*"])
+            sign_and_align_apk(temp_univ, univ_path)
+            temp_univ.unlink(missing_ok=True)
+        else:
+            sign_and_align_apk(out_apk, univ_path)
+        staged_release_apks.append(univ_name)
+        print(f"[{display_name}] Generated universal package: {univ_name} ({univ_path.stat().st_size} bytes)")
+
+        # 2. ARM64-v8a build (if arm64-v8a is supported/present)
+        if "arm64-v8a" in abis:
+            arm64_name = f"{clean_name}-v{resolved_version}-arm64-v8a-morphe-patched.apk"
+            arm64_path = out_dir / arm64_name
+            temp_arm64 = out_dir / f"tmp_arm64_{app_id}.apk"
+            strip_zip_entries(out_apk, temp_arm64, ["lib/x86/*", "lib/x86_64/*", "lib/armeabi-v7a/*"])
+            sign_and_align_apk(temp_arm64, arm64_path)
+            temp_arm64.unlink(missing_ok=True)
+            staged_release_apks.append(arm64_name)
+            print(f"[{display_name}] Generated arm64-v8a package: {arm64_name} ({arm64_path.stat().st_size} bytes)")
+
+        # 3. ARMeabi-v7a build (if armeabi-v7a is present)
+        if "armeabi-v7a" in abis:
+            armv7_name = f"{clean_name}-v{resolved_version}-armeabi-v7a-morphe-patched.apk"
+            armv7_path = out_dir / armv7_name
+            temp_armv7 = out_dir / f"tmp_armv7_{app_id}.apk"
+            strip_zip_entries(out_apk, temp_armv7, ["lib/x86/*", "lib/x86_64/*", "lib/arm64-v8a/*"])
+            sign_and_align_apk(temp_armv7, armv7_path)
+            temp_armv7.unlink(missing_ok=True)
+            staged_release_apks.append(armv7_name)
+            print(f"[{display_name}] Generated armeabi-v7a package: {armv7_name} ({armv7_path.stat().st_size} bytes)")
+
+        # Also provide generic version alias (points to arm64 or universal)
+        generic_name = f"{clean_name}-v{resolved_version}-morphe-patched.apk"
+        generic_path = out_dir / generic_name
+        primary_source = arm64_path if "arm64-v8a" in abis else univ_path
         try:
-            shutil.copy2(out_apk, release_apk_path)
+            shutil.copy2(primary_source, generic_path)
+            staged_release_apks.append(generic_name)
         except Exception:
-            release_apk_name = out_apk.name
+            pass
+
+        primary_release_apk = staged_release_apks[0]
+        primary_release_path = out_dir / primary_release_apk
+        primary_inspect = inspect_apk(primary_release_path)
 
         # 7. Create build manifest
         manifest = {
@@ -420,9 +572,11 @@ def main():
             "input_version": resolved_version,
             "patch_revision": args.patch_revision,
             "input_sha256": inspect_info["sha256"],
-            "output_sha256": out_inspect["sha256"],
-            "output_size_bytes": out_inspect["size"],
-            "output_apk": release_apk_name,
+            "output_sha256": primary_inspect["sha256"],
+            "output_size_bytes": primary_inspect["size"],
+            "output_apk": primary_release_apk,
+            "output_apks": staged_release_apks,
+            "architectures": [a for a in ["universal", "arm64-v8a", "armeabi-v7a"] if any(a in name for name in staged_release_apks)],
             "signature_status": sig_info.get("status"),
             "side_by_side_enabled": args.enable_side_by_side and app.get("side_by_side_supported", False),
             "experimental_mode": args.experimental_mode,

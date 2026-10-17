@@ -6,6 +6,9 @@
 name: Build Patched APKs
 
 on:
+  push:
+    branches:
+      - main
   schedule:
     - cron: '0 6 * * *'  # Daily at 06:00 UTC
   workflow_dispatch:
@@ -202,7 +205,7 @@ jobs:
           fi
 
           FORCE_ARG=""
-          if [ "$FORCE_FULL" = "true" ] || [ "$SELECT_ALL" = "true" ]; then
+          if [ "$FORCE_FULL" = "true" ] || [ "$SELECT_ALL" = "true" ] || [ "$EVENT_NAME" = "push" ]; then
             FORCE_ARG="--force-full"
           fi
 

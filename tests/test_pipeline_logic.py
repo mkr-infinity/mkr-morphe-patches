@@ -43,11 +43,11 @@ def test_invalid_app_id():
 
 
 def test_yaml_workflow_triggers():
-    print("[*] Testing: build-patched-apk.yml has schedule & workflow_dispatch without push/pull_request...")
+    print("[*] Testing: build-patched-apk.yml has push, schedule & workflow_dispatch without pull_request...")
     workflow_path = REPO_ROOT / ".github" / "workflows" / "build-patched-apk.yml"
     content = workflow_path.read_text(encoding="utf-8")
-    for forbidden in ["push:", "pull_request:"]:
-        assert forbidden not in content, f"Forbidden trigger {forbidden} found in build-patched-apk.yml!"
+    assert "pull_request:" not in content, "Forbidden trigger pull_request found in build-patched-apk.yml!"
+    assert "push:" in content, "Missing push trigger in build-patched-apk.yml!"
     assert "schedule:" in content, "Missing schedule trigger in build-patched-apk.yml!"
     assert "workflow_dispatch:" in content, "Missing workflow_dispatch trigger in build-patched-apk.yml!"
     assert "force_full_rebuild:" in content, "Missing force_full_rebuild input in build-patched-apk.yml!"
@@ -346,6 +346,38 @@ def test_release_publisher_clean_versioned_apks():
     print("    [PASS] Release publisher clean versioned asset naming and deduplication verified.")
 
 
+def test_architecture_abi_stripping():
+    print("[*] Testing: architecture ABI detection and library stripping...")
+    import zipfile
+    from scripts.patch_apk import get_apk_abis, strip_zip_entries
+
+    with tempfile.TemporaryDirectory() as td:
+        dummy_apk = Path(td) / "dummy_multi_abi.apk"
+        with zipfile.ZipFile(dummy_apk, "w") as z:
+            z.writestr("AndroidManifest.xml", b"manifest")
+            z.writestr("classes.dex", b"dex")
+            z.writestr("lib/arm64-v8a/libfoo.so", b"arm64")
+            z.writestr("lib/armeabi-v7a/libfoo.so", b"armv7")
+            z.writestr("lib/x86/libfoo.so", b"x86")
+            z.writestr("lib/x86_64/libfoo.so", b"x86_64")
+
+        abis = get_apk_abis(dummy_apk)
+        assert "arm64-v8a" in abis
+        assert "armeabi-v7a" in abis
+        assert "x86" in abis
+
+        # Test arm64 stripping
+        arm64_apk = Path(td) / "arm64_only.apk"
+        strip_zip_entries(dummy_apk, arm64_apk, ["lib/x86/*", "lib/x86_64/*", "lib/armeabi-v7a/*"])
+        with zipfile.ZipFile(arm64_apk, "r") as z:
+            names = z.namelist()
+            assert "lib/arm64-v8a/libfoo.so" in names
+            assert "lib/armeabi-v7a/libfoo.so" not in names
+            assert "lib/x86/libfoo.so" not in names
+
+    print("    [PASS] Architecture ABI detection and stripping work accurately.")
+
+
 def main():
     print("Running pipeline logic tests...")
     test_empty_app_selection()
@@ -359,6 +391,7 @@ def main():
     test_apk_fetcher_version_normalization()
     test_apk_fetcher_bundle_detection()
     test_release_publisher_clean_versioned_apks()
+    test_architecture_abi_stripping()
     print("\n[ALL PIPELINE LOGIC TESTS PASSED]")
 
 
