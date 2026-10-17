@@ -98,7 +98,7 @@ def versions_match(v1: str, v2: str) -> bool:
 
 
 def download_file(url: str, dest_path: Path, headers: Optional[Dict[str, str]] = None, timeout: int = 60) -> bool:
-    """Download file with progress and basic retry."""
+    """Download file with progress and basic retry across multiple HTTP clients."""
     req_headers = {"User-Agent": DESKTOP_UA}
     if headers:
         req_headers.update(headers)
@@ -107,70 +107,74 @@ def download_file(url: str, dest_path: Path, headers: Optional[Dict[str, str]] =
     temp_path = dest_path.with_suffix(dest_path.suffix + ".part")
 
     for attempt in range(1, 4):
-        try:
-            downloaded = 0
-            total_size = 0
-            if HAS_CURL_CFFI:
+        # 1. Try curl_cffi Chrome impersonation if available
+        if HAS_CURL_CFFI:
+            try:
                 session = cffi_requests.Session(impersonate="chrome120")
-                response = None
                 try:
                     response = session.get(url, headers=req_headers, stream=True, timeout=timeout)
                     response.raise_for_status()
                     total_size = int(response.headers.get("content-length", 0))
+                    downloaded = 0
                     with open(temp_path, "wb") as f:
                         for chunk in response.iter_content(chunk_size=65536):
                             if chunk:
                                 f.write(chunk)
                                 downloaded += len(chunk)
+                    if (total_size == 0 and downloaded > 10000) or (total_size > 0 and downloaded >= total_size):
+                        temp_path.replace(dest_path)
+                        logging.info(f"Successfully downloaded {dest_path.name} via curl_cffi ({downloaded} bytes).")
+                        return True
                 finally:
-                    if response is not None:
-                        try:
-                            response.close()
-                        except Exception:
-                            pass
                     try:
                         session.close()
                     except Exception:
                         pass
-            else:
-                req = urllib.request.Request(url, headers=req_headers)
-                with urllib.request.urlopen(req, timeout=timeout) as response:
-                    total_size = int(response.headers.get("content-length", 0))
-                    with open(temp_path, "wb") as f:
-                        while True:
-                            chunk = response.read(65536)
-                            if not chunk:
-                                break
-                            f.write(chunk)
-                            downloaded += len(chunk)
-
-            if total_size > 0 and downloaded < total_size:
-                raise IOError(f"Truncated download ({downloaded}/{total_size} bytes)")
-
-            temp_path.replace(dest_path)
-            logging.info(f"Successfully downloaded {dest_path.name} ({downloaded} bytes).")
-            return True
-        except Exception as e:
-            logging.warning(f"Download attempt {attempt} failed for {url}: {e}")
-            if temp_path.exists():
-                temp_path.unlink()
-            # Attempt curl CLI fallback if Python download failed
-            try:
-                cmd = ["curl", "-sSL", "-L", "-A", req_headers.get("User-Agent", DESKTOP_UA)]
-                if "Referer" in req_headers:
-                    cmd.extend(["-e", req_headers["Referer"]])
-                cmd.extend(["-o", str(temp_path), url])
-                subprocess.run(cmd, check=True, timeout=timeout)
-                if temp_path.is_file() and temp_path.stat().st_size > 10000:
-                    temp_path.replace(dest_path)
-                    logging.info(f"Successfully downloaded {dest_path.name} via curl CLI fallback ({dest_path.stat().st_size} bytes).")
-                    return True
-            except Exception as ce:
-                logging.debug(f"curl CLI fallback failed for {url}: {ce}")
+            except Exception as e:
+                logging.debug(f"curl_cffi attempt {attempt} failed: {e}")
                 if temp_path.exists():
                     temp_path.unlink()
-            if attempt < 3:
-                time.sleep(2 * attempt)
+
+        # 2. Try standard Python urllib
+        try:
+            req = urllib.request.Request(url, headers=req_headers)
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                total_size = int(response.headers.get("content-length", 0))
+                downloaded = 0
+                with open(temp_path, "wb") as f:
+                    while True:
+                        chunk = response.read(65536)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+            if (total_size == 0 and downloaded > 10000) or (total_size > 0 and downloaded >= total_size):
+                temp_path.replace(dest_path)
+                logging.info(f"Successfully downloaded {dest_path.name} via urllib ({downloaded} bytes).")
+                return True
+        except Exception as e:
+            logging.debug(f"urllib attempt {attempt} failed: {e}")
+            if temp_path.exists():
+                temp_path.unlink()
+
+        # 3. Try curl CLI fallback
+        try:
+            cmd = ["curl", "-sSL", "-L", "-A", req_headers.get("User-Agent", DESKTOP_UA)]
+            if "Referer" in req_headers:
+                cmd.extend(["-e", req_headers["Referer"]])
+            cmd.extend(["-o", str(temp_path), url])
+            subprocess.run(cmd, check=True, timeout=timeout)
+            if temp_path.is_file() and temp_path.stat().st_size > 10000:
+                temp_path.replace(dest_path)
+                logging.info(f"Successfully downloaded {dest_path.name} via curl CLI fallback ({dest_path.stat().st_size} bytes).")
+                return True
+        except Exception as ce:
+            logging.debug(f"curl CLI fallback failed for {url}: {ce}")
+            if temp_path.exists():
+                temp_path.unlink()
+
+        if attempt < 3:
+            time.sleep(2 * attempt)
 
     return False
 
@@ -202,6 +206,7 @@ def download_apkeditor(tools_dir: Path) -> Optional[Path]:
         return editor_path
 
     urls = [
+        "https://github.com/REAndroid/APKEditor/releases/download/V1.4.9/APKEditor-1.4.9.jar",
         "https://github.com/REAndroid/APKEditor/releases/download/V1.4.3/APKEditor-1.4.3.jar",
         "https://github.com/REAndroid/APKEditor/releases/latest/download/APKEditor.jar",
     ]
@@ -336,7 +341,7 @@ def fetch_from_apkpure_api(
         dl_url = selected_entry["asset"]["urls"][0]
         logging.info(f"Downloading {package_id} v{selected_version} from APKPure CDN...")
         apk_headers = {
-            "User-Agent": APKPURE_API_HEADERS["User-Agent"],
+            "User-Agent": DESKTOP_UA,
             "Referer": "https://apkpure.net/",
         }
         if download_file(dl_url, dest_path, headers=apk_headers):
@@ -503,10 +508,11 @@ def resolve_and_download_apk(
     if is_split_bundle(raw_dest):
         logging.info(f"[{display_name}] Downloaded file is a split bundle (XAPK/APKM/APKS). Merging...")
         merged = merge_bundle_to_apk(raw_dest, final_apk, tools_dir)
-        raw_dest.unlink(missing_ok=True)
         if not merged:
-            logging.error(f"[{display_name}] Bundle merge failed.")
-            return None, ""
+            logging.warning(f"[{display_name}] Standalone bundle merge failed; copying bundle as input APK for Morphe native merge.")
+            raw_dest.replace(final_apk)
+        else:
+            raw_dest.unlink(missing_ok=True)
     else:
         raw_dest.replace(final_apk)
 

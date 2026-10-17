@@ -75,6 +75,19 @@ def parse_binary_manifest_fallback(apk_path):
 
 def parse_app_manifest_aapt(apk_path):
     """Attempts to extract package and version using aapt2 or aapt, with binary XML fallback."""
+    # Check if file is a zip/bundle containing manifest.json (e.g. XAPK)
+    if zipfile.is_zipfile(apk_path):
+        try:
+            with zipfile.ZipFile(apk_path, "r") as z:
+                if "manifest.json" in z.namelist():
+                    m_data = json.loads(z.read("manifest.json").decode("utf-8", errors="ignore"))
+                    pkg = m_data.get("package_name") or m_data.get("packageName")
+                    ver = m_data.get("version_name") or m_data.get("versionName")
+                    if pkg:
+                        return pkg, ver
+        except Exception:
+            pass
+
     aapt_cmd = shutil.which("aapt2") or shutil.which("aapt")
     if aapt_cmd:
         try:
@@ -425,7 +438,7 @@ def main():
         applied_patches = []
         cmd_bundle_args = []
         for idx, bp in enumerate(bundle_candidates):
-            cmd_bundle_args.extend(["-p", str(bp)])
+            cmd_bundle_args.extend(["-p", str(bp.resolve())])
             # Apply bundle options immediately after the -p flag to conform with Picocli ArgGroup
             if idx == 0:
                 if args.enable_side_by_side:
@@ -433,8 +446,8 @@ def main():
                         print(f"[{display_name}] Enabling side-by-side 'Clone app' patch...")
                         cmd_bundle_args.extend(["-e", "Clone app"])
                         applied_patches.append("Clone app")
-                        if args.custom_clone_pkg:
-                            cmd_bundle_args.extend([f"-OpackageName={args.custom_clone_pkg}"])
+                        clone_pkg = args.custom_clone_pkg or f"{expected_pkg}.morphe"
+                        cmd_bundle_args.extend([f"-OpackageName={clone_pkg}"])
                     elif app_id not in ("youtube", "youtube_music"):
                         note = app.get("side_by_side_note", "Side-by-side cloning is not supported for this app target.")
                         print(f"[{display_name}] INFO: {note}")
@@ -443,13 +456,21 @@ def main():
                     import shlex
                     cmd_bundle_args.extend(shlex.split(args.extra_options))
 
+        out_apk_resolved = out_apk.resolve()
+        result_json_resolved = result_json.resolve()
+        input_apk_resolved = input_apk.resolve()
+
+        # Clean prior stale output files
+        out_apk.unlink(missing_ok=True)
+        result_json.unlink(missing_ok=True)
+
         cmd = [
             "java",
-            "-jar", str(args.morphe_jar),
+            "-jar", str(Path(args.morphe_jar).resolve()),
             "patch",
             *cmd_bundle_args,
-            "-o", str(out_apk),
-            "-r", str(result_json),
+            "-o", str(out_apk_resolved),
+            "-r", str(result_json_resolved),
             "--continue-on-error",
             "--unsigned",
         ]
@@ -457,7 +478,7 @@ def main():
         if args.experimental_mode or not is_compatible or force_patch:
             cmd.append("-f")
 
-        cmd.append(str(input_apk))
+        cmd.append(str(input_apk_resolved))
 
         # 5. Execute Morphe patcher
         print(f"[{display_name}] Executing Morphe Patcher command:")
@@ -471,18 +492,18 @@ def main():
             print(f"[{display_name}] Primary patch command failed (exit code {proc.returncode}). Retrying with clean default command...", file=sys.stderr)
             clean_cmd = [
                 "java",
-                "-jar", str(args.morphe_jar),
+                "-jar", str(Path(args.morphe_jar).resolve()),
                 "patch",
             ]
             for bp in bundle_candidates:
-                clean_cmd.extend(["-p", str(bp)])
+                clean_cmd.extend(["-p", str(bp.resolve())])
             clean_cmd.extend([
-                "-o", str(out_apk),
-                "-r", str(result_json),
+                "-o", str(out_apk_resolved),
+                "-r", str(result_json_resolved),
                 "--continue-on-error",
                 "--unsigned",
                 "-f",
-                str(input_apk),
+                str(input_apk_resolved),
             ])
             print(f"[{display_name}] Executing Fallback Morphe command:")
             print("  " + " ".join(clean_cmd))
@@ -499,6 +520,10 @@ def main():
         # Save build log
         log_path = out_dir / f"{app_id}-patch.log"
         log_path.write_text(log_content, encoding="utf-8")
+        try:
+            log_rel = str(log_path.resolve().relative_to(REPO_ROOT.resolve()))
+        except Exception:
+            log_rel = str(log_path.name)
 
         if proc.returncode != 0 or not out_apk.is_file() or os.path.getsize(out_apk) == 0:
             # If the app is a custom target with no patches in the official Morphe bundle, mark as skipped
@@ -513,7 +538,7 @@ def main():
                     "patch_revision": args.patch_revision,
                     "status": "SKIPPED_UNSUPPORTED",
                     "reason": skip_msg,
-                    "log": str(log_path.relative_to(REPO_ROOT)),
+                    "log": log_rel,
                     "build_timestamp": datetime.now(timezone.utc).isoformat(),
                 }
                 build_results.append(entry)
@@ -534,7 +559,7 @@ def main():
                 "patch_revision": args.patch_revision,
                 "status": "PATCH_FAILED",
                 "reason": err,
-                "log": str(log_path.relative_to(REPO_ROOT)),
+                "log": log_rel,
                 "build_timestamp": datetime.now(timezone.utc).isoformat(),
             }
             build_results.append(entry)

@@ -318,6 +318,12 @@ jobs:
             fi
           fi
 
+          if [ ! -s "tools/APKEditor.jar" ]; then
+            echo "[*] Fetching APKEditor..."
+            curl -sL "https://github.com/REAndroid/APKEditor/releases/download/V1.4.9/APKEditor-1.4.9.jar" -o tools/APKEditor.jar || \
+            curl -sL "https://github.com/REAndroid/APKEditor/releases/download/V1.4.3/APKEditor-1.4.3.jar" -o tools/APKEditor.jar || true
+          fi
+
           if [ ! -s "tools/morphe-desktop.jar" ]; then
             echo "::error::Could not download a valid morphe-desktop.jar file."
             exit 1
