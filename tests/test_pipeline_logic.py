@@ -9,6 +9,7 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
 
 
 def test_empty_app_selection():
@@ -266,6 +267,85 @@ def test_release_publisher_manifest_consolidation():
     print("    [PASS] Release publisher correctly aggregates state and builds release notes.")
 
 
+def test_apk_fetcher_version_normalization():
+    print("[*] Testing: apk_fetcher version normalization and matching logic...")
+    from scripts.apk_fetcher import normalize_version, versions_match
+
+    # Exact matching
+    assert versions_match("21.20.405", "21.20.405")
+    # 'v' prefix
+    assert versions_match("v21.20.405", "21.20.405")
+    # Release suffix
+    assert versions_match("10.70.0-release.0", "10.70.0")
+    # Build text suffix
+    assert versions_match("6.4 build 049", "6.4")
+    # In-parenthesis architecture noise
+    assert versions_match("21.20.405 (arm64-v8a)", "21.20.405")
+    # Different versions do not match
+    assert not versions_match("21.20.405", "21.20.406")
+    assert not versions_match("", "21.20.405")
+    print("    [PASS] Version normalization and matching behave accurately.")
+
+
+def test_apk_fetcher_bundle_detection():
+    print("[*] Testing: apk_fetcher split bundle and zip detection...")
+    import zipfile
+    from scripts.apk_fetcher import is_split_bundle
+
+    # Extension-based checks
+    assert is_split_bundle(Path("app.xapk"))
+    assert is_split_bundle(Path("app.apkm"))
+    assert is_split_bundle(Path("app.apks"))
+
+    with tempfile.TemporaryDirectory() as td:
+        bundle_path = Path(td) / "split.zip"
+        with zipfile.ZipFile(bundle_path, "w") as z:
+            z.writestr("base.apk", b"base")
+            z.writestr("split_config.arm64_v8a.apk", b"split")
+        assert is_split_bundle(bundle_path)
+
+        standalone_path = Path(td) / "standalone.apk"
+        with zipfile.ZipFile(standalone_path, "w") as z:
+            z.writestr("AndroidManifest.xml", b"manifest")
+            z.writestr("classes.dex", b"dex")
+        assert not is_split_bundle(standalone_path)
+
+    print("    [PASS] Bundle detection correctly identifies split packages and standalone APKs.")
+
+
+def test_release_publisher_clean_versioned_apks():
+    print("[*] Testing: publish_release.py prioritizes clean versioned APKs over raw names...")
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td)
+        apks_dir = p / "apks"
+        apks_dir.mkdir()
+        out_dir = p / "dist"
+        manifests_dir = p / "manifests"
+        manifests_dir.mkdir()
+
+        # Place raw apk and clean versioned apk
+        (apks_dir / "youtube-patched.apk").write_bytes(b"apk1" * 50)
+        (apks_dir / "YouTube-v21.20.405-morphe-patched.apk").write_bytes(b"apk2" * 50)
+
+        cmd = [
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "publish_release.py"),
+            "--manifests-dir", str(manifests_dir),
+            "--apks-dir", str(apks_dir),
+            "--output-dir", str(out_dir),
+            "--tag-name", "patched-apks",
+            "--dry-run",
+        ]
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        assert proc.returncode == 0, f"Publisher failed: {proc.stderr}"
+
+        # Clean versioned APK must be staged, raw -patched.apk deduplicated away
+        assert (out_dir / "YouTube-v21.20.405-morphe-patched.apk").is_file()
+        assert not (out_dir / "youtube-patched.apk").is_file()
+
+    print("    [PASS] Release publisher clean versioned asset naming and deduplication verified.")
+
+
 def main():
     print("Running pipeline logic tests...")
     test_empty_app_selection()
@@ -276,8 +356,12 @@ def main():
     test_incremental_planner_single_app_bump()
     test_incremental_planner_force_full()
     test_release_publisher_manifest_consolidation()
+    test_apk_fetcher_version_normalization()
+    test_apk_fetcher_bundle_detection()
+    test_release_publisher_clean_versioned_apks()
     print("\n[ALL PIPELINE LOGIC TESTS PASSED]")
 
 
 if __name__ == "__main__":
     main()
+

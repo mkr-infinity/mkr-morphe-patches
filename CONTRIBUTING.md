@@ -40,7 +40,7 @@ Add a new JSON entry to the `apps` array with:
   "source_revision": "main",
   "compatible_versions": ["1.0.0"],
   "tested_versions": ["1.0.0"],
-  "apk_input_policy": "manual_artifact_or_url",
+  "apk_input_policy": "automated_download_with_manual_fallback",
   "has_custom_patches": true,
   "apk_build_supported": true,
   "side_by_side_supported": true,

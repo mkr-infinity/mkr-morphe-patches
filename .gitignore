@@ -132,4 +132,6 @@ morphe-data/
 *.apkm
 *.xapk
 *.apks
+__pycache__/
+*.pyc
 

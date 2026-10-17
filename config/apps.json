@@ -26,7 +26,7 @@
         "21.20.405",
         "20.51.39"
       ],
-      "apk_input_policy": "manual_artifact_or_url",
+      "apk_input_policy": "automated_download_with_manual_fallback",
       "has_custom_patches": false,
       "apk_build_supported": true,
       "side_by_side_supported": true,
@@ -55,7 +55,7 @@
         "9.20.53",
         "9.15.51"
       ],
-      "apk_input_policy": "manual_artifact_or_url",
+      "apk_input_policy": "automated_download_with_manual_fallback",
       "has_custom_patches": false,
       "apk_build_supported": true,
       "side_by_side_supported": true,
@@ -84,7 +84,7 @@
         "2026.24.0",
         "2026.10.0"
       ],
-      "apk_input_policy": "manual_artifact_or_url",
+      "apk_input_policy": "automated_download_with_manual_fallback",
       "has_custom_patches": false,
       "apk_build_supported": true,
       "side_by_side_supported": true,
@@ -110,7 +110,7 @@
       "tested_versions": [
         "6.4 build 049"
       ],
-      "apk_input_policy": "manual_artifact_or_url",
+      "apk_input_policy": "automated_download_with_manual_fallback",
       "has_custom_patches": true,
       "apk_build_supported": true,
       "side_by_side_supported": false,
@@ -141,7 +141,7 @@
       "tested_versions": [
         "15.6"
       ],
-      "apk_input_policy": "manual_artifact_or_url",
+      "apk_input_policy": "automated_download_with_manual_fallback",
       "has_custom_patches": true,
       "apk_build_supported": true,
       "side_by_side_supported": true,
@@ -167,7 +167,7 @@
       "tested_versions": [
         "355.0.0.44.106"
       ],
-      "apk_input_policy": "manual_artifact_or_url",
+      "apk_input_policy": "automated_download_with_manual_fallback",
       "has_custom_patches": true,
       "apk_build_supported": true,
       "side_by_side_supported": false,
@@ -193,7 +193,7 @@
       "tested_versions": [
         "11.8.2"
       ],
-      "apk_input_policy": "direct_download_supported_or_manual",
+      "apk_input_policy": "automated_download_with_manual_fallback",
       "direct_download_url": "https://telegram.org/dl/android/apk",
       "has_custom_patches": true,
       "apk_build_supported": true,
@@ -219,7 +219,7 @@
       "tested_versions": [
         "485.0.0.52.79"
       ],
-      "apk_input_policy": "manual_artifact_or_url",
+      "apk_input_policy": "automated_download_with_manual_fallback",
       "has_custom_patches": true,
       "apk_build_supported": true,
       "side_by_side_supported": false,
@@ -244,7 +244,7 @@
       "tested_versions": [
         "10.65.0-release.0"
       ],
-      "apk_input_policy": "manual_artifact_or_url",
+      "apk_input_policy": "automated_download_with_manual_fallback",
       "has_custom_patches": true,
       "apk_build_supported": true,
       "side_by_side_supported": true,
@@ -274,7 +274,7 @@
       "tested_versions": [
         "37.4.3"
       ],
-      "apk_input_policy": "manual_artifact_or_url",
+      "apk_input_policy": "automated_download_with_manual_fallback",
       "has_custom_patches": true,
       "apk_build_supported": true,
       "side_by_side_supported": true,
@@ -301,7 +301,7 @@
       "tested_versions": [
         "20.7.0"
       ],
-      "apk_input_policy": "manual_artifact_or_url",
+      "apk_input_policy": "automated_download_with_manual_fallback",
       "has_custom_patches": true,
       "apk_build_supported": true,
       "side_by_side_supported": false,
@@ -327,7 +327,7 @@
       "tested_versions": [
         "6.25.4"
       ],
-      "apk_input_policy": "manual_artifact_or_url",
+      "apk_input_policy": "automated_download_with_manual_fallback",
       "has_custom_patches": true,
       "apk_build_supported": true,
       "side_by_side_supported": false,
@@ -352,7 +352,7 @@
       "tested_versions": [
         "475.0.0.40.108"
       ],
-      "apk_input_policy": "manual_artifact_or_url",
+      "apk_input_policy": "automated_download_with_manual_fallback",
       "has_custom_patches": true,
       "apk_build_supported": true,
       "side_by_side_supported": false,
@@ -378,7 +378,7 @@
       "tested_versions": [
         "248.0"
       ],
-      "apk_input_policy": "manual_artifact_or_url",
+      "apk_input_policy": "automated_download_with_manual_fallback",
       "has_custom_patches": true,
       "apk_build_supported": true,
       "side_by_side_supported": true,

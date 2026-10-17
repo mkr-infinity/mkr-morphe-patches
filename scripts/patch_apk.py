@@ -177,22 +177,9 @@ def main():
         expected_pkg = app["package_id"]
         print(f"\n[{display_name}] Starting build processing...")
 
-        # 1. Locate APK
+        # 1. Locate or automatically download APK
         candidate_apks = list(input_dir.glob(f"{app_id}*.apk")) + list(input_dir.glob(f"{expected_pkg}*.apk"))
         input_apk = candidate_apks[0] if candidate_apks else None
-
-        # Auto-download from official source for Telegram if no APK was uploaded
-        if not input_apk and app_id == "telegram":
-            telegram_url = app.get("direct_download_url", "https://telegram.org/dl/android/apk")
-            print(f"[{display_name}] Auto-fetching official Telegram APK from {telegram_url}...")
-            dl_target = input_dir / f"{app_id}.apk"
-            try:
-                import urllib.request
-                urllib.request.urlretrieve(telegram_url, dl_target)
-                input_apk = dl_target
-                print(f"[{display_name}] Downloaded official APK successfully ({os.path.getsize(dl_target)} bytes).")
-            except Exception as e:
-                print(f"[{display_name}] Failed to auto-download Telegram APK: {e}", file=sys.stderr)
 
         # Download from custom URL if passed via input
         if not input_apk and args.apk_url:
@@ -205,8 +192,32 @@ def main():
             except Exception as e:
                 print(f"[{display_name}] Failed to download APK from URL: {e}", file=sys.stderr)
 
+        # Automated multi-source downloading if no local/manual APK provided
         if not input_apk or not input_apk.is_file():
-            err_msg = f"No input APK found for {display_name}. Upload an artifact named 'apk-{app_id}' or provide a direct download URL."
+            print(f"[{display_name}] No local APK provided; querying automated multi-source downloader...")
+            try:
+                try:
+                    from scripts.apk_fetcher import resolve_and_download_apk
+                except ImportError:
+                    sys.path.insert(0, str(REPO_ROOT))
+                    from scripts.apk_fetcher import resolve_and_download_apk
+
+                tools_dir = Path("tools")
+                fetched_apk, fetched_ver = resolve_and_download_apk(
+                    app_id=app_id,
+                    app_cfg=app,
+                    requested_version=args.app_version,
+                    tools_dir=tools_dir,
+                    dest_dir=input_dir,
+                )
+                if fetched_apk and fetched_apk.is_file():
+                    input_apk = fetched_apk
+                    print(f"[{display_name}] Successfully auto-fetched base APK (v{fetched_ver}): {input_apk.name}")
+            except Exception as e:
+                print(f"[{display_name}] Automated downloader encountered error: {e}", file=sys.stderr)
+
+        if not input_apk or not input_apk.is_file():
+            err_msg = f"No input APK available for {display_name} after checking all automated sources, artifacts, and URLs."
             print(f"[SKIP] {err_msg}", file=sys.stderr)
             entry = {
                 "app_id": app_id,
@@ -392,6 +403,14 @@ def main():
             except Exception:
                 pass
 
+        clean_name = re.sub(r"[^a-zA-Z0-9._-]", "_", display_name)
+        release_apk_name = f"{clean_name}-v{resolved_version}-morphe-patched.apk"
+        release_apk_path = out_dir / release_apk_name
+        try:
+            shutil.copy2(out_apk, release_apk_path)
+        except Exception:
+            release_apk_name = out_apk.name
+
         # 7. Create build manifest
         manifest = {
             "app_id": app_id,
@@ -403,7 +422,7 @@ def main():
             "input_sha256": inspect_info["sha256"],
             "output_sha256": out_inspect["sha256"],
             "output_size_bytes": out_inspect["size"],
-            "output_apk": out_apk.name,
+            "output_apk": release_apk_name,
             "signature_status": sig_info.get("status"),
             "side_by_side_enabled": args.enable_side_by_side and app.get("side_by_side_supported", False),
             "experimental_mode": args.experimental_mode,

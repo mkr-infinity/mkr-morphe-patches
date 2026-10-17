@@ -57,6 +57,7 @@ def main():
     parser.add_argument("--apks-dir", default="release_apks", help="Directory where patched APK artifacts were downloaded")
     parser.add_argument("--previous-manifest", default="", help="Path to previous manifest.json downloaded from latest release")
     parser.add_argument("--output-dir", default="release_dist", help="Directory to stage release assets")
+    parser.add_argument("--tag-name", default="patched-apks", help="Release tag name to create/update (default: patched-apks)")
     parser.add_argument("--run-number", default=os.environ.get("GITHUB_RUN_NUMBER", "1"), help="GitHub run number")
     parser.add_argument("--run-id", default=os.environ.get("GITHUB_RUN_ID", "local"), help="GitHub run ID")
     parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", "mkr-infinity/mkr-morphe-patches"), help="Target repository")
@@ -115,7 +116,10 @@ def main():
         candidate_apks.extend(manifests_dir.rglob("*.apk"))
 
     seen_apk_names = set()
+    has_versioned = any("-morphe-patched.apk" in p.name for p in candidate_apks)
     for apk_path in candidate_apks:
+        if has_versioned and apk_path.name.endswith("-patched.apk") and not apk_path.name.endswith("-morphe-patched.apk"):
+            continue
         if apk_path.name in seen_apk_names or apk_path.stat().st_size == 0:
             continue
         dest = out_dir / apk_path.name
@@ -149,18 +153,18 @@ def main():
         json.dump(manifest_doc, f, indent=2)
 
     # 5. Build clean release notes markdown
-    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-    tag_name = f"apks-build-{run_num}"
-    release_title = f"MKR Morphe Patched APKs (Build #{run_num})"
+    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    tag_name = args.tag_name
+    release_title = f"MKR Morphe Patched APKs (Latest)"
 
     notes_lines = [
-        f"### 📱 MKR Morphe Patched Android APKs (Build #{run_num})",
+        f"### 📱 MKR Morphe Patched Android APKs",
         "",
-        f"- **Built At:** `{date_str}`",
+        f"- **Updated At:** `{date_str}`",
         f"- **Morphe Patches Revision:** `{patch_revision}`",
-        f"- **Workflow Run ID:** `{run_id}`",
+        f"- **Workflow Run ID:** `{run_id}` (Build #{run_num})",
         "",
-        f"#### ✅ Newly Built Patched APKs ({len(staged_apks)}):",
+        f"#### ✅ Available Patched APKs ({len(staged_apks)}):",
         "",
         "| Application | Package ID | Version | Output Size | SHA-256 Checksum | Signature |",
         "|---|---|---|:---:|---|:---:|",
@@ -219,6 +223,14 @@ def main():
         )
         if rc_up != 0:
             print(f"[!] Warning uploading assets: {err_up}", file=sys.stderr)
+        # Refresh release title and notes
+        run_gh_command([
+            "release", "edit", tag_name,
+            "--repo", args.repo,
+            "--title", release_title,
+            "--notes-file", str(notes_file),
+            "--latest",
+        ])
     else:
         print(f"[*] Creating new release '{tag_name}'...")
         rc_cr, _, err_cr = run_gh_command([
@@ -227,6 +239,7 @@ def main():
             "--repo", args.repo,
             "--title", release_title,
             "--notes-file", str(notes_file),
+            "--latest",
         ])
         if rc_cr != 0:
             print(f"[!] Warning creating release: {err_cr}", file=sys.stderr)
