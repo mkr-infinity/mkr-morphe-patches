@@ -43,24 +43,31 @@ def test_invalid_app_id():
 
 
 def test_yaml_workflow_triggers():
-    print("[*] Testing: build-patched-apk.yml has schedule & workflow_dispatch without pull_request or push...")
+    print("[*] Testing: build-patched-apk.yml has manual workflow_dispatch ONLY (no cron/schedule, push, or pull_request)...")
     workflow_path = REPO_ROOT / ".github" / "workflows" / "build-patched-apk.yml"
     content = workflow_path.read_text(encoding="utf-8")
     assert "pull_request:" not in content, "Forbidden trigger pull_request found in build-patched-apk.yml!"
     assert "push:" not in content, "Forbidden trigger push found in build-patched-apk.yml!"
-    assert "schedule:" in content, "Missing schedule trigger in build-patched-apk.yml!"
+    assert "schedule:" not in content, "Forbidden trigger schedule/cron found in build-patched-apk.yml!"
     assert "workflow_dispatch:" in content, "Missing workflow_dispatch trigger in build-patched-apk.yml!"
     assert "force_full_rebuild:" in content, "Missing force_full_rebuild input in build-patched-apk.yml!"
-    print("    [PASS] Trigger constraints strictly satisfied.")
+    assert "delete_previous_release:" in content, "Missing delete_previous_release input in build-patched-apk.yml!"
+    assert "clean_old_workflow_runs:" in content, "Missing clean_old_workflow_runs input in build-patched-apk.yml!"
+    print("    [PASS] Manual workflow_dispatch constraints strictly satisfied.")
 
 
-def test_upstream_update_no_apk_build():
-    print("[*] Testing: update-upstream.yml contains no APK build steps...")
-    workflow_path = REPO_ROOT / ".github" / "workflows" / "update-upstream.yml"
-    content = workflow_path.read_text(encoding="utf-8")
-    assert "patch_apk.py" not in content, "update-upstream.yml must never call patch_apk.py!"
-    assert "build-apks" not in content, "update-upstream.yml must never contain APK build jobs!"
-    print("    [PASS] Upstream workflow cannot build APKs.")
+def test_single_all_in_one_workflow():
+    print("[*] Testing: exactly one all-in-one workflow exists in .github/workflows...")
+    workflows = list((REPO_ROOT / ".github" / "workflows").glob("*.yml")) + list((REPO_ROOT / ".github" / "workflows").glob("*.yaml"))
+    assert len(workflows) == 1, f"Expected exactly 1 workflow file, found {len(workflows)}: {[w.name for w in workflows]}"
+    assert workflows[0].name == "build-patched-apk.yml", f"Expected build-patched-apk.yml, found {workflows[0].name}"
+
+    content = workflows[0].read_text(encoding="utf-8")
+    assert "validate:" in content, "All-in-one workflow missing validate job!"
+    assert "plan-builds:" in content, "All-in-one workflow missing plan-builds job!"
+    assert "build-app:" in content, "All-in-one workflow missing build-app job!"
+    assert "publish-release:" in content, "All-in-one workflow missing publish-release job!"
+    print("    [PASS] Single all-in-one workflow architecture verified.")
 
 
 def test_incremental_planner_no_change():
@@ -413,7 +420,7 @@ def main():
     test_empty_app_selection()
     test_invalid_app_id()
     test_yaml_workflow_triggers()
-    test_upstream_update_no_apk_build()
+    test_single_all_in_one_workflow()
     test_incremental_planner_no_change()
     test_incremental_planner_single_app_bump()
     test_incremental_planner_force_full()

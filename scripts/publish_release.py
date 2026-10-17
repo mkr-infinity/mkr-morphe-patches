@@ -61,6 +61,7 @@ def main():
     parser.add_argument("--run-number", default=os.environ.get("GITHUB_RUN_NUMBER", "1"), help="GitHub run number")
     parser.add_argument("--run-id", default=os.environ.get("GITHUB_RUN_ID", "local"), help="GitHub run ID")
     parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", "mkr-infinity/mkr-morphe-patches"), help="Target repository")
+    parser.add_argument("--delete-previous-release", action="store_true", help="Delete previous release and old APK assets before publishing fresh release")
     parser.add_argument("--dry-run", action="store_true", help="Stage assets and print notes without calling gh release")
 
     args = parser.parse_args()
@@ -74,9 +75,9 @@ def main():
     run_num = str(args.run_number)
     run_id = str(args.run_id)
 
-    # 1. Load previous manifest if provided
+    # 1. Load previous manifest if provided and not deleting previous release
     consolidated_apps = {}
-    if args.previous_manifest and Path(args.previous_manifest).is_file():
+    if not args.delete_previous_release and args.previous_manifest and Path(args.previous_manifest).is_file():
         try:
             with open(args.previous_manifest, "r", encoding="utf-8") as pf:
                 prev_data = json.load(pf)
@@ -234,9 +235,21 @@ def main():
     release_assets = [str(manifest_dest)] + [str(p) for p in staged_apks]
     print(f"[*] Publishing release '{tag_name}' to {args.repo} with {len(release_assets)} assets...")
 
+    if not args.dry_run and args.delete_previous_release:
+        print(f"[*] Deleting previous release '{tag_name}' and clearing prior release APKs...")
+        run_gh_command(["release", "delete", tag_name, "--repo", args.repo, "--yes", "--cleanup-tag"])
+        rc_list, stdout_list, _ = run_gh_command(["release", "list", "--repo", args.repo, "--limit", "50"])
+        if rc_list == 0 and stdout_list.strip():
+            for line in stdout_list.strip().splitlines():
+                parts = line.split()
+                if parts:
+                    old_t = parts[0]
+                    print(f"[*] Deleting old release '{old_t}'...")
+                    run_gh_command(["release", "delete", old_t, "--repo", args.repo, "--yes", "--cleanup-tag"])
+
     # Check if release tag already exists
     rc_view, _, _ = run_gh_command(["release", "view", tag_name, "--repo", args.repo])
-    if rc_view == 0:
+    if rc_view == 0 and not args.delete_previous_release:
         print(f"[*] Release '{tag_name}' exists; uploading assets with --clobber...")
         rc_up, _, err_up = run_gh_command(
             ["release", "upload", tag_name, *release_assets, "--repo", args.repo, "--clobber"]
@@ -252,7 +265,7 @@ def main():
             "--latest",
         ])
     else:
-        print(f"[*] Creating new release '{tag_name}'...")
+        print(f"[*] Creating clean release '{tag_name}'...")
         rc_cr, _, err_cr = run_gh_command([
             "release", "create", tag_name,
             *release_assets,

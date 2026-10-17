@@ -8,8 +8,7 @@
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL_v3.0-d97706.svg?style=flat-square)](LICENSE)
 [![Morphe Compatible](https://img.shields.io/badge/Morphe-Compatible-f59e0b.svg?style=flat-square&logo=android)](https://github.com/MorpheApp)
 [![Maintainer](https://img.shields.io/badge/Maintainer-mkr--infinity-b45309.svg?style=flat-square&logo=github)](https://github.com/mkr-infinity)
-[![APK Builds](https://img.shields.io/badge/APK_Builds-Scheduled_%26_On--Demand-f59e0b.svg?style=flat-square)](.github/workflows/build-patched-apk.yml)
-[![Upstream Sync](https://img.shields.io/badge/Upstream_Sync-Automated-d97706.svg?style=flat-square)](.github/workflows/update-upstream.yml)
+[![All-in-One APK Builds](https://img.shields.io/badge/APK_Builds-On--Demand_Universal-f59e0b.svg?style=flat-square)](.github/workflows/build-patched-apk.yml)
 
 <br>
 
@@ -32,19 +31,12 @@
 
 `mkr-morphe-patches` is an automated, configuration-driven Android patching laboratory and Morphe source repository:
 
-1. **Automatic Daily & On-Demand APK Builds (`build-patched-apk.yml`)**:
-   - Runs automatically on a daily schedule (`06:00 UTC`) or manually via `workflow_dispatch`.
-   - **Incremental Build Planner (`scripts/plan_builds.py`)**: Fetches `manifest.json` from the latest release and diffs current target versions and patch bundle revisions. If nothing has changed, the build finishes in seconds with `SKIPPED_NO_CHANGE` without rebuilding APKs.
-   - **Isolated Matrix Builds**: If one or more apps update, GitHub Actions launches targeted matrix build jobs only for affected apps.
-   - **Consolidated Release Publisher (`scripts/publish_release.py`)**: Automatically updates `manifest.json`, rolls forward untouched APKs, publishes newly built APKs to GitHub Releases (`patched-apks`), and generates structured markdown release notes.
-   - Manual builds support `Select all apps`, individual app checkboxes, and `force_full_rebuild`.
-2. **Automatic Upstream Monitoring (`update-upstream.yml`)**:
-   - Monitored weekly via scheduled GitHub Actions.
-   - Compares releases from official upstream Morphe repositories (`MorpheApp/morphe-patches`, `MorpheApp/morphe-desktop`).
-   - Opens a clean, reviewable pull request when new upstream releases or version targets are detected.
-3. **CI Validation & Remote Patch Compilation (`validate.yml`)**:
-   - Validates central catalog parity, security boundaries, and YAML integrity.
-   - Verifies patch compilation remotely using GitHub Actions (`./gradlew :patches:buildAndroid`).
+1. **All-in-One On-Demand Universal APK Pipeline (`build-patched-apk.yml`)**:
+   - Runs exclusively on-demand via manual `workflow_dispatch` (no cron schedules or push runs).
+   - **Automated Verification**: Runs syntax checks, catalog validation, and pipeline logic tests prior to planning.
+   - **Dynamic Upstream Sync & Incremental Planner (`scripts/plan_builds.py`)**: Automatically queries latest upstream Morphe releases and compatibility tables.
+   - **Isolated Matrix Builds & Universal Packaging (`scripts/patch_apk.py`)**: Builds and signs clean universal APK packages (`*-universal-morphe-patched.apk`) with 32-bit and 64-bit ARM support.
+   - **Purge History & Release Publisher (`scripts/publish_release.py`)**: Automatically purges previous workflow runs and deletes previous releases/old APK assets to guarantee a pristine, clean release state on every run.
 
 ---
 

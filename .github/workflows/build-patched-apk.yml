@@ -6,8 +6,6 @@
 name: Build Patched APKs
 
 on:
-  schedule:
-    - cron: '0 6 * * *'  # Daily at 06:00 UTC
   workflow_dispatch:
     inputs:
       force_full_rebuild:
@@ -110,6 +108,16 @@ on:
         type: boolean
         default: true
 
+      delete_previous_release:
+        description: "🗑️ Delete previous GitHub Release and old APKs"
+        type: boolean
+        default: true
+
+      clean_old_workflow_runs:
+        description: "🧹 Purge previous GitHub Actions workflow runs"
+        type: boolean
+        default: true
+
       apk_source_url:
         description: "Optional direct download URL for input APK (if not provided via artifact)"
         type: string
@@ -131,10 +139,47 @@ concurrency:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
+  validate:
+    name: Validate Codebase & Registry
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate YAML files syntax
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 -c "
+          import yaml, glob, sys
+
+          files = glob.glob('.github/**/*.yml', recursive=True) + glob.glob('.github/**/*.yaml', recursive=True)
+          for f in files:
+              try:
+                  with open(f, 'r') as fp:
+                      yaml.safe_load(fp)
+                  print(f'[+] Valid YAML: {f}')
+              except Exception as e:
+                  print(f'[!] Invalid YAML {f}: {e}', file=sys.stderr)
+                  sys.exit(1)
+          "
+
+      - name: Run Catalog & Security Validator
+        run: python3 scripts/validate_catalog.py
+
+      - name: Run Pipeline Logic Tests
+        run: python3 tests/test_pipeline_logic.py
+
   plan-builds:
     name: Plan Incremental Builds
+    needs: validate
     runs-on: ubuntu-latest
     outputs:
       has_updates: ${{ steps.planner.outputs.has_updates }}
@@ -381,15 +426,17 @@ jobs:
 
   publish-release:
     name: Publish GitHub Release
-    needs: [plan-builds, build-app]
+    needs: [validate, plan-builds, build-app]
     if: |
       always() &&
       !cancelled() &&
+      needs.validate.result == 'success' &&
       needs.plan-builds.outputs.has_updates == 'true' &&
-      (github.event_name == 'schedule' || inputs.publish_release == true)
+      (inputs.publish_release == true || inputs.publish_release == 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -398,6 +445,26 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Purge Previous Workflow Runs
+        if: inputs.clean_old_workflow_runs == true || inputs.clean_old_workflow_runs == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "[*] Deleting older GitHub Action workflow runs..."
+          python3 scripts/cleanup_github_actions.py || true
+
+      - name: Delete Previous GitHub Release & Old APKs
+        if: inputs.delete_previous_release == true || inputs.delete_previous_release == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "[*] Deleting existing release 'patched-apks' and cleaning tag/assets..."
+          gh release delete patched-apks --repo "${{ github.repository }}" --yes --cleanup-tag || true
 
       - name: Download all patched APK artifacts
         continue-on-error: true
@@ -416,6 +483,7 @@ jobs:
           merge-multiple: true
 
       - name: Download Previous Release Manifest
+        if: inputs.delete_previous_release != true && inputs.delete_previous_release != 'true'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -435,17 +503,23 @@ jobs:
             PREV_ARG="--previous-manifest previous_state/manifest.json"
           fi
 
+          DELETE_FLAG=""
+          if [ "${{ inputs.delete_previous_release }}" = "true" ]; then
+            DELETE_FLAG="--delete-previous-release"
+          fi
+
           python3 scripts/publish_release.py \
             --manifests-dir "release_manifests" \
             --apks-dir "release_apks" \
             --tag-name "patched-apks" \
             --run-number "$RUN_NUM" \
             --run-id "$RUN_ID" \
-            $PREV_ARG
+            $PREV_ARG \
+            $DELETE_FLAG
 
   build-summary:
     name: Build Summary
-    needs: [plan-builds, build-app, publish-release]
+    needs: [validate, plan-builds, build-app, publish-release]
     if: always()
     runs-on: ubuntu-latest
     steps:

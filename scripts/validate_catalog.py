@@ -95,15 +95,23 @@ def validate_workflow_inputs(registered_ids):
 
     content = WORKFLOW_PATH.read_text(encoding="utf-8")
 
-    # Automated triggers: schedule and manual workflow_dispatch. Push and pull requests are excluded to prevent accidental runs on commit.
+    # Triggers: Manual workflow_dispatch only. Push, cron/schedule, and pull requests are forbidden.
     if "pull_request:" in content:
         raise ValueError("Security violation: build-patched-apk.yml must have NO pull_request triggers.")
 
     if "push:" in content:
-        raise ValueError("Trigger violation: build-patched-apk.yml must not run on push; use workflow_dispatch or schedule.")
+        raise ValueError("Trigger violation: build-patched-apk.yml must not run on push; manual workflow_dispatch only.")
 
-    if "workflow_dispatch:" not in content or "schedule:" not in content:
-        raise ValueError("Missing workflow_dispatch or schedule trigger in build-patched-apk.yml.")
+    if "schedule:" in content:
+        raise ValueError("Trigger violation: build-patched-apk.yml must not run on cron/schedule; manual workflow_dispatch only.")
+
+    if "workflow_dispatch:" not in content:
+        raise ValueError("Missing workflow_dispatch trigger in build-patched-apk.yml.")
+
+    # Check for single all-in-one workflow architecture
+    workflows = list((REPO_ROOT / ".github" / "workflows").glob("*.yml")) + list((REPO_ROOT / ".github" / "workflows").glob("*.yaml"))
+    if len(workflows) != 1 or workflows[0].name != "build-patched-apk.yml":
+        raise ValueError(f"Repository must contain exactly 1 all-in-one workflow file, found: {[w.name for w in workflows]}")
 
     # Check for required inputs
     if "select_all:" not in content:
@@ -111,6 +119,12 @@ def validate_workflow_inputs(registered_ids):
 
     if "force_full_rebuild:" not in content:
         raise ValueError("Missing 'force_full_rebuild' boolean input in build-patched-apk.yml.")
+
+    if "delete_previous_release:" not in content:
+        raise ValueError("Missing 'delete_previous_release' boolean input in build-patched-apk.yml.")
+
+    if "clean_old_workflow_runs:" not in content:
+        raise ValueError("Missing 'clean_old_workflow_runs' boolean input in build-patched-apk.yml.")
 
     # Check each registered app ID exists as an input
     for app_id in registered_ids:
